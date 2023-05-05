@@ -22,8 +22,8 @@ func (s *sqlite3) DataType(typ reflect.Value) string {
 	switch typ.Kind() {
 	case reflect.Bool:
 		return "bool"
-	case reflect.Int, reflect.Int16, reflect.Int32,
-		reflect.Uint, reflect.Uint16, reflect.Uint32:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32:
 		return "integer"
 	case reflect.Int64, reflect.Uint64:
 		return "bigint"

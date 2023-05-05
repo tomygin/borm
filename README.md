@@ -10,6 +10,16 @@
 go get -u github.com/tomygin/box@latest
 ```
 
+## 重要说明
+
+今天2023年5月5日我用box进行开发某个项目，box在简单易用方面表现不错，灵活的代价就是繁琐
+
+所以还是用XORM或GORM这种成熟ORM更加明智，当然如果你怀着一腔热血用box我是不会阻拦的
+
+box仍然会保持缓慢更新，也许某一天也能更加成熟吧😁
+
+
+
 ## 快速上手
 
 ### session介绍
@@ -196,41 +206,7 @@ func main() {
 
 
 
-### 扩展功能
 
-#### 消息告警
-
-```go
-package main
-
-import (
-	"time"
-
-	"github.com/tomygin/box/extensions/postal"
-)
-
-func main() {
-	// 注册推送平台
-	p := postal.NewPostal(
-		&postal.Xtuis{Token: "your token"},
-		&postal.Dida{Account: "xxx@outlook.com", Password: "xxx"})
-	// 以协程向所有成功注册的平台发送消息
-	// 发送完毕就退出单个send最大阻塞时间为平台数*1s
-	p.Send("tomygin", "nice!")
-	p.Send("第二波", "ok")
-	p.Send("第三波", "ok")
-	p.Send("第四波", "ok")
-
-
-}
-
-
-```
-
-##### 目前接入的消息告警
-
-- [虾推啥](https://xtuis.cn/)
-- [滴答清单](https://www.dida365.com/)
 
 ## 必要说明
 
@@ -251,8 +227,6 @@ func main() {
 - [x] 自动记录执行的sql语句
 - [x] 异步插入
 - [x] 爬虫数据缓冲保存
-- [ ] cache类型使用范型扩展
-- [ ] 支持mysql
 
 ### 已修复
 
