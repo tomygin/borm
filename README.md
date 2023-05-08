@@ -16,7 +16,7 @@ go get -u github.com/tomygin/box@latest
 
 所以还是用XORM或GORM这种成熟ORM更加明智，当然如果你怀着一腔热血用box我是不会阻拦的
 
-box仍然会保持缓慢更新，也许某一天也能更加成熟吧😁
+也许某一天也能更加成熟吧😁
 
 
 
