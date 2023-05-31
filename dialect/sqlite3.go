@@ -5,7 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" //内置sqlite3
+	// _ "github.com/mattn/go-sqlite3" //内置sqlite3
+	_ "modernc.org/sqlite"
 )
 
 type sqlite3 struct{}
@@ -14,7 +15,7 @@ type sqlite3 struct{}
 var _ Dialect = (*sqlite3)(nil)
 
 func init() {
-	RegisterDialect("sqlite3", &sqlite3{})
+	RegisterDialect("sqlite", &sqlite3{})
 }
 
 // DataType将go的数据类型转化为sqlite3的数据类型
