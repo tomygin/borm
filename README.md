@@ -4,7 +4,7 @@
 
 这是一款轻量级的数据持久化库，用于爬虫后期工作，还在递归更新中，相信你能3分钟内上手，默认使用sqlite3数据库
 
-### 更新或下载
+## 更新或下载
 
 ```go
 go get -u github.com/tomygin/box@latest
@@ -210,10 +210,9 @@ func main() {
 
 ## 必要说明
 
-1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并
-2. sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/box/releases/tag/v1.0.0)下载
-3. 历史记录默认开启，如果需要关闭请在你的代码里面添加` s.Options(session.CloseHistory())`
-4. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.Options(session.OpenHook())`
+1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/box/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，愉快地跨平台吧
+1. 历史记录默认开启，如果需要关闭请在你的代码里面添加` s.Options(session.CloseHistory())`
+2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.Options(session.OpenHook())`
 
 ## box进度
 
@@ -230,9 +229,9 @@ func main() {
 
 ### 已修复
 
-- 代码逻辑结构不清晰✔
-- 偶然情况钩子函数失效✔
-- 终端打印颜色跨平台失效✔
+- 代码逻辑结构不清晰
+- 偶然情况钩子函数失效
+- 终端打印颜色跨平台失效
 
 ## License
 
