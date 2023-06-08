@@ -22,7 +22,7 @@ type Engine struct {
 // NewEngine用于生成一个Engine实例
 // 在没有指定驱动的时候默认认为sqlite3
 func NewEngine(info ...string) (e *Engine, err error) {
-	driver := "sqlite3"
+	driver := "sqlite"
 	source := "box.db"
 
 	switch len(info) {
