@@ -2,23 +2,13 @@
 
 ## box 介绍
 
-这是一款轻量级的数据持久化库，用于爬虫后期工作，还在递归更新中，相信你能3分钟内上手，默认使用sqlite3数据库
+这是一款轻量级的数据持久化库，还在递归更新中，相信你能3分钟内上手，默认使用sqlite3数据库
 
 ## 更新或下载
 
 ```go
 go get -u github.com/tomygin/box@latest
 ```
-
-## 重要说明
-
-今天2023年5月5日我用box进行开发某个项目，box在简单易用方面表现不错，灵活的代价就是繁琐
-
-所以还是用XORM或GORM这种成熟ORM更加明智，当然如果你怀着一腔热血用box我是不会阻拦的
-
-也许某一天也能更加成熟吧😁
-
-
 
 ## 快速上手
 
@@ -157,7 +147,7 @@ AfterInsert
 
 ### cache介绍
 
-适用于 kv 数据，但这里的 key 和 value 目前仅仅支持string类型，同时会自动创建一个Item表用于持久化缓存数据
+适用于 kv 数据，但这里的 key 和 value 目前仅仅支持string类型，如果设置了session同时会自动创建一个Item表用于持久化缓存数据
 
 ```go
 package main
@@ -173,7 +163,8 @@ func main() {
 	defer engine.Close()
 
 	// 设置缓存大小为 8 byte
-	c := engine.NewCache(1 << 3)
+	// 默认删除数据的时候保存在数据库中
+	c := engine.NewCache(1 << 3,nil,engine.NewSession())
 	go c.Add("h0", "imok")
 	go c.Add("h1", "imok")
 	go c.Add("h2", "imok")
@@ -205,18 +196,14 @@ func main() {
 ```
 
 
-
-
-
 ## 必要说明
 
-1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/box/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，愉快地跨平台吧
+1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/box/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，pull的时候可能略微缓慢，愉快地跨平台吧 :)
 1. 历史记录默认开启，如果需要关闭请在你的代码里面添加` s.Options(session.CloseHistory())`
 2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.Options(session.OpenHook())`
 
-## box进度
 
-### 未来计划
+## 未来计划
 
 - [x] 支持钩子函数
 - [x] 事务提交
@@ -226,16 +213,12 @@ func main() {
 - [x] 自动记录执行的sql语句
 - [x] 异步插入
 - [x] 爬虫数据缓冲保存
-
-### 已修复
-
-- 代码逻辑结构不清晰
-- 偶然情况钩子函数失效
-- 终端打印颜色跨平台失效
+- [ ] 支持mysql
 
 ## License
 
-box released under the [MIT-License](./LICENSE)
+box learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
+released under the [MIT-License](./LICENSE)
 
 
 

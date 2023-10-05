@@ -72,7 +72,11 @@ func (e *Engine) NewSession() *session.Session {
 	return s
 }
 
-func (e *Engine) NewCache(maxBytes int64) *cache.Cache {
-	c := cache.New(maxBytes, nil, e.NewSession())
+// NewCache用于生成一个Cache实例
+// maxBytes用于设置缓存的最大值
+// onDelete用于设置删除缓存数据时的回调函数
+// s用于设置底层的数据库，如果有的话，在缓存里面找不到的数据就会去数据库里面找
+func (e *Engine) NewCache(maxBytes int64, onDelete func(key, value string, s *session.Session), s *session.Session) *cache.Cache {
+	c := cache.New(maxBytes, onDelete, s)
 	return c
 }
