@@ -1,6 +1,6 @@
-package box
+package borm
 
-import "github.com/tomygin/box/session"
+import "github.com/tomygin/borm/session"
 
 // 事务的回调函数
 type TxFunc func(*session.Session) (interface{}, error)

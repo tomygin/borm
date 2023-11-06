@@ -3,7 +3,7 @@ package session
 import (
 	"reflect"
 
-	"github.com/tomygin/box/log"
+	"github.com/tomygin/borm/log"
 )
 
 const (
@@ -16,8 +16,6 @@ const (
 	BeforeInsert = "BeforeInsert"
 	AfterInsert  = "AfterInsert"
 )
-
-
 
 // CallMethod会调用Before,After系列的方法
 // 如果value为nil调用的对象就是当前数据库的那个对象
@@ -53,4 +51,3 @@ func (s *Session) CallMethod(method string, value interface{}) {
 func (s *Session) Abort() {
 	s.abort = true
 }
-

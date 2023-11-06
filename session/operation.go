@@ -4,7 +4,7 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/tomygin/box/clause"
+	"github.com/tomygin/borm/clause"
 )
 
 func (s *Session) Insert(values ...interface{}) (int64, error) {

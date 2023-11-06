@@ -1,6 +1,6 @@
-module github.com/tomygin/box
+module github.com/tomygin/borm
 
-go 1.20
+go 1.17
 
 require modernc.org/sqlite v1.22.1
 

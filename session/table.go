@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tomygin/box/log"
-	"github.com/tomygin/box/schema"
+	"github.com/tomygin/borm/log"
+	"github.com/tomygin/borm/schema"
 )
 
 // 如果当前对象没有被解析为Schema就解析

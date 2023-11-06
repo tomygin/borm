@@ -1,37 +1,33 @@
 <img src="logo.png" style="zoom:15%;" />
 
-## box 介绍
+## borm 介绍
 
 这是一款轻量级的数据持久化库，还在递归更新中，相信你能3分钟内上手，默认使用sqlite3数据库
 
 ## 更新或下载
 
 ```go
-go get -u github.com/tomygin/box@latest
+go get -u github.com/tomygin/borm@latest
 ```
 
 ## 快速上手
-
-### session介绍
-
-适用于经典关系型数据库的增删改查
 
 ```go
 package main
 
 import (
-	"github.com/tomygin/box"
-	"github.com/tomygin/box/log"
-	"github.com/tomygin/box/session"
+	"github.com/tomygin/borm"
+	"github.com/tomygin/borm/log"
+	"github.com/tomygin/borm/session"
 )
 
 type User struct {
-	Name string `box:"PRIMARY KEY"`
+	Name string `borm:"PRIMARY KEY"`
 	Age  int
 }
 
 func main() {
-	engine, _ := box.NewEngine("test.db")
+	engine, _ := borm.NewEngine("test.db")
 	defer engine.Close()
 
 	s := engine.NewSession().Model(&User{})
@@ -145,63 +141,11 @@ BeforeInsert
 AfterInsert  
 ```
 
-### cache介绍
-
-适用于 kv 数据，但这里的 key 和 value 目前仅仅支持string类型，如果设置了session同时会自动创建一个Item表用于持久化缓存数据
-
-```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/tomygin/box"
-)
-
-func main() {
-	engine, _ := box.NewEngine("test.db")
-	defer engine.Close()
-
-	// 设置缓存大小为 8 byte
-	// 默认删除数据的时候保存在数据库中
-	c := engine.NewCache(1 << 3,nil,engine.NewSession())
-	go c.Add("h0", "imok")
-	go c.Add("h1", "imok")
-	go c.Add("h2", "imok")
-
-	c.Add("h3", "imok")
-	c.Add("h4", "imok")
-	c.Add("h5", "imok")
-	c.Add("h6", "imok")
-
-	//查看缓存区有多少条数据
-	fmt.Println(c.Len())
-
-	if data, isok := c.Get("h6"); isok {
-		//data 是从缓存里面找到的数据
-		fmt.Println(data)
-	}
-
-	// 清除缓存
-	c.Flush()
-
-	fmt.Println(c.Len())
-	if data, isok := c.Get("h6"); isok {
-		//data 是从数据库里面找到的数据
-		fmt.Println(data)
-	}
-
-}
-
-```
-
-
 ## 必要说明
 
-1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/box/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，pull的时候可能略微缓慢，愉快地跨平台吧 :)
+1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/borm/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，pull的时候可能略微缓慢，愉快地跨平台吧 :)
 1. 历史记录默认开启，如果需要关闭请在你的代码里面添加` s.Options(session.CloseHistory())`
 2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.Options(session.OpenHook())`
-
 
 ## 未来计划
 
@@ -215,9 +159,13 @@ func main() {
 - [x] 爬虫数据缓冲保存
 - [ ] 支持mysql
 
+## borm日志
+
+- 2023年11月6日 由`box`更名为`borm` ，去除cache。
+
 ## License
 
-box learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
+borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
 released under the [MIT-License](./LICENSE)
 
 

@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"reflect"
 
-	"github.com/tomygin/box/dialect"
+	"github.com/tomygin/borm/dialect"
 )
 
 // 数据库里面的字段
@@ -48,7 +48,7 @@ func Parse(dest interface{}, d dialect.Dialect) *Schema {
 				Type: d.DataType(reflect.Indirect(reflect.New(p.Type))),
 			}
 
-			if v, ok := p.Tag.Lookup("box"); ok {
+			if v, ok := p.Tag.Lookup("borm"); ok {
 				field.Tag = v
 			}
 

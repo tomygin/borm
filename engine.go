@@ -1,14 +1,13 @@
-// 我相信box未来一定会有很多人用的
-package box
+// 我相信borm未来一定会有很多人用的
+package borm
 
 import (
 	"database/sql"
 	"errors"
 
-	"github.com/tomygin/box/cache"
-	"github.com/tomygin/box/dialect"
-	"github.com/tomygin/box/log"
-	"github.com/tomygin/box/session"
+	"github.com/tomygin/borm/dialect"
+	"github.com/tomygin/borm/log"
+	"github.com/tomygin/borm/session"
 )
 
 // Eingie是引擎对象
@@ -23,7 +22,7 @@ type Engine struct {
 // 在没有指定驱动的时候默认认为sqlite3
 func NewEngine(info ...string) (e *Engine, err error) {
 	driver := "sqlite"
-	source := "box.db"
+	source := "borm.db"
 
 	switch len(info) {
 	case 0:
@@ -70,13 +69,4 @@ func (e *Engine) Close() {
 func (e *Engine) NewSession() *session.Session {
 	s := session.New(e.db, e.dialect)
 	return s
-}
-
-// NewCache用于生成一个Cache实例
-// maxBytes用于设置缓存的最大值
-// onDelete用于设置删除缓存数据时的回调函数
-// s用于设置底层的数据库，如果有的话，在缓存里面找不到的数据就会去数据库里面找
-func (e *Engine) NewCache(maxBytes int64, onDelete func(key, value string, s *session.Session), s *session.Session) *cache.Cache {
-	c := cache.New(maxBytes, onDelete, s)
-	return c
 }
