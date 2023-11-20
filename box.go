@@ -1,3 +1,8 @@
+// Copyright 2023 TomyGin
+//
+// Licensed under the MIT License
+
+// Package borm implements a ORM framework
 package borm
 
 import "github.com/tomygin/borm/session"

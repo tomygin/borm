@@ -1,4 +1,10 @@
+// Copyright 2023 TomyGin
+//
+// Licensed under the MIT License
+
 // 我相信borm未来一定会有很多人用的
+
+// Package borm implements a ORM framework
 package borm
 
 import (

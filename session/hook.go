@@ -22,7 +22,7 @@ const (
 // 否者是value对象作为调用的对象
 func (s *Session) CallMethod(method string, value interface{}) {
 
-	if !s.opts.needHook {
+	if !s.EnableHook {
 		return
 	}
 
@@ -48,6 +48,6 @@ func (s *Session) CallMethod(method string, value interface{}) {
 }
 
 // 在hook中如果执行失败可以调用来结束hook后相关的 增删查改
-func (s *Session) Abort() {
-	s.abort = true
-}
+// func (s *Session) Abort() {
+// 	s.abort = true
+// }

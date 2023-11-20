@@ -21,10 +21,15 @@ type Session struct {
 
 	refTable *schema.Schema //不同结构体反射的Schema对象
 
-	opts    options         //部分功能的开关
-	abort   bool            //在钩子函数中关闭后续操作
 	history strings.Builder //用于记录历史执行了的sql语句
 	tx      *sql.Tx         //事务
+
+	// 在钩子函数中关闭后续操作
+	Abort bool
+	// 开启sql语句历史记录，默认关闭
+	EnableHistory bool
+	// 开启钩子函数，默认关闭
+	EnableHook bool
 }
 
 // 为了对事务的支持
@@ -59,10 +64,7 @@ func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
 	s.clause = clause.Clause{}
-	s.abort = false
-
-	// 保存基本的对Session的配置
-	// s.opts = options{}
+	s.Abort = false
 }
 
 // Raw将sql语句和变量保存在Session中
@@ -77,13 +79,13 @@ func (s *Session) Raw(sql string, values ...interface{}) *Session {
 // 最后会清理Session中的sql语句和变量
 func (s *Session) Exec() (resout sql.Result, err error) {
 	defer s.Clear()
-	if s.abort {
+	if s.Abort {
 		err = errors.New("Abort")
 		log.Error("Abort: ", s.sql.String(), s.sqlVars)
 		return
 	}
 	log.Info(s.sql.String(), s.sqlVars)
-	if !s.opts.notNeedHistory {
+	if s.EnableHistory {
 		s.recordSql(s.sql.String(), s.sqlVars)
 	}
 	if resout, err = s.DB().Exec(s.sql.String(), s.sqlVars...); err != nil {
@@ -94,13 +96,13 @@ func (s *Session) Exec() (resout sql.Result, err error) {
 
 func (s *Session) QueryRow() *sql.Row {
 	defer s.Clear()
-	if s.abort {
+	if s.Abort {
 
 		log.Error("Abort: ", s.sql.String(), s.sqlVars)
 		return nil
 	}
 	log.Info(s.sql.String(), s.sqlVars)
-	if !s.opts.notNeedHistory {
+	if s.EnableHistory {
 		s.recordSql(s.sql.String(), s.sqlVars)
 	}
 	return s.DB().QueryRow(s.sql.String(), s.sqlVars...)
@@ -108,13 +110,13 @@ func (s *Session) QueryRow() *sql.Row {
 
 func (s *Session) QueryRows() (rows *sql.Rows, err error) {
 	defer s.Clear()
-	if s.abort {
+	if s.Abort {
 		err = errors.New("Abort")
 		log.Error("Abort: ", s.sql.String(), s.sqlVars)
 		return
 	}
 	log.Info(s.sql.String(), s.sqlVars)
-	if !s.opts.notNeedHistory {
+	if s.EnableHistory {
 		s.recordSql(s.sql.String(), s.sqlVars)
 	}
 	if rows, err = s.DB().Query(s.sql.String(), s.sqlVars...); err != nil {
