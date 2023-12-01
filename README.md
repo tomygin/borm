@@ -142,7 +142,6 @@ AfterInsert
 
 ## 必要说明
 
-1. 这个项目不定期更新，如果你愿意动手修复问题欢迎PR，我会积极合并 ~~sqlite3的驱动包是C的底层，所以你需要确保你有gcc或者mingw，并且配置了环境变量，对于Windows可以直接点击[这里](https://github.com/tomygin/borm/releases/tag/v1.0.0)下载~~,目前已经替换为纯GO写的sqlite的驱动，pull的时候可能略微缓慢，愉快地跨平台吧 :)
 1. 历史记录默认关闭，如果需要打开请在你的代码里面添加` s.EnableHistory = true`
 2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.EnableHook = true`
 
@@ -156,13 +155,14 @@ AfterInsert
 - [x] 自动记录执行的sql语句
 - [x] 异步插入
 - [x] 爬虫数据缓冲保存
-- [ ] 从新实现注册回调函数
-- [ ] 支持mysql
+- [ ] ~~从新实现注册回调函数~~
+- [ ] ~~支持mysql~~
 
 ## borm日志
 
 - 2023年11月6日 由`box`更名为`borm` ，去除cache。
 - 2023年11月20日 去除不必要的选项卡初始化
+- 2023年12月1日 暂时归档
 
 ## License
 
