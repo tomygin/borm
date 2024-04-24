@@ -1,10 +1,10 @@
 <img src="logo.png" style="zoom:15%;" />
 
-## borm 介绍
+## Borm 介绍
 
-这是一款轻量级的数据持久化库，还在递归更新中，相信你能3分钟内上手，默认使用sqlite3数据库
+这是一款轻量级的 ORM 库，还在递归更新中，相信你能 3 分钟内上手，默认使用 Sqlite3 数据库。
 
-## 更新或下载
+## 安装最新版
 
 ```go
 go get -u github.com/tomygin/borm@latest
@@ -142,8 +142,8 @@ AfterInsert
 
 ## 必要说明
 
-1. 历史记录默认关闭，如果需要打开请在你的代码里面添加` s.EnableHistory = true`
-2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.EnableHook = true`
+1. 历史记录默认关闭，如果需要打开请在你的代码里面添加` s.EnableHistory = true`。
+2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.EnableHook = true`。
 
 ## 未来计划
 
@@ -160,13 +160,14 @@ AfterInsert
 
 ## borm日志
 
-- 2023年11月6日 由`box`更名为`borm` ，去除cache。
-- 2023年11月20日 去除不必要的选项卡初始化
-- 2023年12月1日 暂时归档
+- 2024年04月24日 根据阮一峰的文档标准修改README
+- 2023年11月6日 由 Box 更名为 Borm ，去除 cache。
+- 2023年11月20日 去除不必要的选项卡初始化。
+- 2023年12月1日 暂时归档。
 
 ## License
 
-borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
+Borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
 released under the [MIT-License](./LICENSE)
 
 
