@@ -1,4 +1,4 @@
-// Copyright 2023 TomyGin
+// Copyright 2023 log4gin
 //
 // Licensed under the MIT License
 
@@ -11,9 +11,9 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/tomygin/borm/dialect"
-	"github.com/tomygin/borm/log"
-	"github.com/tomygin/borm/session"
+	"github.com/log4gin/borm/dialect"
+	"github.com/log4gin/borm/log"
+	"github.com/log4gin/borm/session"
 )
 
 // Eingie是引擎对象

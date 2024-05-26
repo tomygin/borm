@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/tomygin/borm/clause"
-	"github.com/tomygin/borm/dialect"
-	"github.com/tomygin/borm/log"
-	"github.com/tomygin/borm/schema"
+	"github.com/log4gin/borm/clause"
+	"github.com/log4gin/borm/dialect"
+	"github.com/log4gin/borm/log"
+	"github.com/log4gin/borm/schema"
 )
 
 type Session struct {

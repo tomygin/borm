@@ -2,12 +2,13 @@
 
 ## Borm 介绍
 
-这是一款轻量级的 ORM 库，还在递归更新中，相信你能 3 分钟内上手，默认使用 Sqlite3 数据库。
+这是一款轻量级的 ORM 库，还在递归更新中，相信你能 3 分钟内上手，默认使用 Sqlite3
+数据库。
 
 ## 安装最新版
 
 ```go
-go get -u github.com/tomygin/borm@latest
+go get -u github.com/log4gin/borm@latest
 ```
 
 ## 快速上手
@@ -16,9 +17,9 @@ go get -u github.com/tomygin/borm@latest
 package main
 
 import (
-	"github.com/tomygin/borm"
-	"github.com/tomygin/borm/log"
-	"github.com/tomygin/borm/session"
+	"github.com/log4gin/borm"
+	"github.com/log4gin/borm/log"
+	"github.com/log4gin/borm/session"
 )
 
 type User struct {
@@ -45,7 +46,7 @@ func main() {
 
 	// 插入操作
 	if affect, err := s.Insert(
-		&User{Name: "tomygin", Age: 20},
+		&User{Name: "log4gin", Age: 20},
 		&User{Name: "ice", Age: 19},
 		&User{Name: "test", Age: 18},
 		&User{Name: "t0", Age: 100},
@@ -60,7 +61,7 @@ func main() {
 
 	// 单条查询
 	tmp := User{}
-	if err := s.Where("Name = ?", "tomygin").First(&tmp); err != nil {
+	if err := s.Where("Name = ?", "log4gin").First(&tmp); err != nil {
 		log.Error(err)
 	}
 
@@ -82,10 +83,10 @@ func main() {
 	}
 
 	// 更新
-	s.Where("Name = ?", "tomygin").Update("Age", 18)
+	s.Where("Name = ?", "log4gin").Update("Age", 18)
 
 	// 查看更新
-	s.Where("Name = ?", "tomygin").First(&tmp)
+	s.Where("Name = ?", "log4gin").First(&tmp)
 	log.Info(tmp)
 
 	// 排序查找最小年龄
@@ -100,9 +101,9 @@ func main() {
 		// s 是新的会话，先前对外部会话的设置对此会话无效，如有需要请重新设置
 		s.Model(&User{})
 		s.CreateTable()
-		s.Insert(&User{Name: "tomygin"})
+		s.Insert(&User{Name: "log4gin"})
 		t := User{}
-		err := s.Where("Name = ?", "tomygin").First(&t)
+		err := s.Where("Name = ?", "log4gin").First(&t)
 		return t, err
 	})
 	log.Info(r, err)
@@ -130,14 +131,14 @@ func (u *User) BeforeQuery(s *session.Session) error {
 
 ```go
 // 可用的钩子函数
-BeforeQuery  
-AfterQuery   
-BeforeUpdate 
-AfterUpdate  
-BeforeDelete 
-AfterDelete  
-BeforeInsert 
-AfterInsert  
+BeforeQuery
+AfterQuery
+BeforeUpdate
+AfterUpdate
+BeforeDelete
+AfterDelete
+BeforeInsert
+AfterInsert
 ```
 
 ## 必要说明
@@ -147,28 +148,25 @@ AfterInsert
 
 ## 未来计划
 
-- [x] 支持钩子函数
-- [x] 事务提交
-- [x] 选项初始化
-- [x] 分页
-- [x] 钩子函数终止后续操作
-- [x] 自动记录执行的sql语句
-- [x] 异步插入
-- [x] 爬虫数据缓冲保存
-- [ ] ~~从新实现注册回调函数~~
-- [ ] ~~支持mysql~~
+-   [x] 支持钩子函数
+-   [x] 事务提交
+-   [x] 选项初始化
+-   [x] 分页
+-   [x] 钩子函数终止后续操作
+-   [x] 自动记录执行的 sql 语句
+-   [x] 异步插入
+-   [x] 爬虫数据缓冲保存
+-   [ ] ~~从新实现注册回调函数~~
+-   [ ] ~~支持 mysql~~
 
-## borm日志
+## borm 日志
 
-- 2024年04月24日 根据阮一峰的文档标准修改README。
-- 2023年11月6日 由 Box 更名为 Borm ，去除 cache。
-- 2023年11月20日 去除不必要的选项卡初始化。
-- 2023年12月1日 暂时归档。
+-   2024 年 04 月 24 日 根据阮一峰的文档标准修改 README。
+-   2023 年 11 月 6 日 由 Box 更名为 Borm ，去除 cache。
+-   2023 年 11 月 20 日 去除不必要的选项卡初始化。
+-   2023 年 12 月 1 日 暂时归档。
 
 ## License
 
-Borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html)
-released under the [MIT-License](./LICENSE)
-
-
-
+Borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html) released under
+the [MIT-License](./LICENSE)

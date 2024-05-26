@@ -1,11 +1,11 @@
-// Copyright 2023 TomyGin
+// Copyright 2023 log4gin
 //
 // Licensed under the MIT License
 
 // Package borm implements a ORM framework
 package borm
 
-import "github.com/tomygin/borm/session"
+import "github.com/log4gin/borm/session"
 
 // 事务的回调函数
 type TxFunc func(*session.Session) (interface{}, error)

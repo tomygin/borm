@@ -3,7 +3,7 @@ package session
 import (
 	"reflect"
 
-	"github.com/tomygin/borm/log"
+	"github.com/log4gin/borm/log"
 )
 
 const (
