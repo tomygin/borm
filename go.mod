@@ -1,4 +1,4 @@
-module github.com/log4gin/borm
+module github.com/tomygin/borm
 
 go 1.17
 

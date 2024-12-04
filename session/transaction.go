@@ -1,6 +1,6 @@
 package session
 
-import "github.com/log4gin/borm/log"
+import "github.com/tomygin/borm/log"
 
 func (s *Session) Begin() (err error) {
 	log.Info("transaction begin")

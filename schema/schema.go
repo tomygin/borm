@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"reflect"
 
-	"github.com/log4gin/borm/dialect"
+	"github.com/tomygin/borm/dialect"
 )
 
 // 数据库里面的字段

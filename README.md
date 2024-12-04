@@ -8,7 +8,7 @@
 ## 安装最新版
 
 ```go
-go get -u github.com/log4gin/borm@latest
+go get -u github.com/tomygin/borm@latest
 ```
 
 ## 快速上手
@@ -17,9 +17,9 @@ go get -u github.com/log4gin/borm@latest
 package main
 
 import (
-	"github.com/log4gin/borm"
-	"github.com/log4gin/borm/log"
-	"github.com/log4gin/borm/session"
+	"github.com/tomygin/borm"
+	"github.com/tomygin/borm/log"
+	"github.com/tomygin/borm/session"
 )
 
 type User struct {
@@ -46,7 +46,7 @@ func main() {
 
 	// 插入操作
 	if affect, err := s.Insert(
-		&User{Name: "log4gin", Age: 20},
+		&User{Name: "tomygin", Age: 20},
 		&User{Name: "ice", Age: 19},
 		&User{Name: "test", Age: 18},
 		&User{Name: "t0", Age: 100},
@@ -61,7 +61,7 @@ func main() {
 
 	// 单条查询
 	tmp := User{}
-	if err := s.Where("Name = ?", "log4gin").First(&tmp); err != nil {
+	if err := s.Where("Name = ?", "tomygin").First(&tmp); err != nil {
 		log.Error(err)
 	}
 
@@ -83,10 +83,10 @@ func main() {
 	}
 
 	// 更新
-	s.Where("Name = ?", "log4gin").Update("Age", 18)
+	s.Where("Name = ?", "tomygin").Update("Age", 18)
 
 	// 查看更新
-	s.Where("Name = ?", "log4gin").First(&tmp)
+	s.Where("Name = ?", "tomygin").First(&tmp)
 	log.Info(tmp)
 
 	// 排序查找最小年龄
@@ -101,9 +101,9 @@ func main() {
 		// s 是新的会话，先前对外部会话的设置对此会话无效，如有需要请重新设置
 		s.Model(&User{})
 		s.CreateTable()
-		s.Insert(&User{Name: "log4gin"})
+		s.Insert(&User{Name: "tomygin"})
 		t := User{}
-		err := s.Where("Name = ?", "log4gin").First(&t)
+		err := s.Where("Name = ?", "tomygin").First(&t)
 		return t, err
 	})
 	log.Info(r, err)
