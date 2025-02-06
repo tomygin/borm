@@ -12,20 +12,20 @@ type User struct {
 }
 
 func main() {
-	engine, _ := borm.NewEngine("test.db")
+	engine, _ := borm.NewEngine("mysql", "root:root@/tch")
 	defer engine.Close()
 
 	s := engine.NewSession().Model(&User{})
 
 	// 开启钩子函数
-	s.EnableHook = true
+	// s.EnableHook = true
+
 	// 增删表
-	s.CreateTable()
-	defer s.DropTable()
+	// defer s.DropTable()
 
 	// 判断表存在
-	if s.IsExistTable() {
-		log.Info("表存在")
+	if !s.IsExistTable() {
+		s.CreateTable()
 	}
 
 	// 插入操作
@@ -51,15 +51,15 @@ func main() {
 
 	// 多条查询
 	tmps := []User{}
-	if err := s.Where("Age > 10").Find(&tmps); err == nil {
+	if err := s.Where("Age > 18").Find(&tmps); err == nil {
 		log.Info("拿到数据", tmps)
 	}
 
 	// 分页查询
 	// Page 仅仅是封装了 Limit 和 Offset
-	if err := s.Where("Age > 10").Page(1, 2).Find(&tmps); err == nil {
-		log.Info("分页查询到数据", tmps)
-	}
+	// if err := s.Where("Age > 10").Page(1, 2).Find(&tmps); err == nil {
+	// 	log.Info("分页查询到数据", tmps)
+	// }
 
 	// 删除
 	if _, err := s.Where("Age = ?", 18).Limit(1).Delete(); err != nil {
@@ -106,7 +106,7 @@ func (u *User) BeforeQuery(s *session.Session) error {
 	log.Info("钩子函数运行成功")
 
 	// 不希望最后执行sql
-	s.Abort = true
+	// s.Abort = true
 
 	return nil
 }
