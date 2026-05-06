@@ -5,20 +5,18 @@ import (
 	"reflect"
 	"time"
 
-	// _ "github.com/mattn/go-sqlite3" //内置sqlite3
 	_ "modernc.org/sqlite"
 )
 
 type sqlite3 struct{}
 
-// 在编译期检测sqlite3结构体是否实现了Dialect接口
 var _ Dialect = (*sqlite3)(nil)
 
 func init() {
 	RegisterDialect("sqlite", &sqlite3{})
 }
 
-// DataType将go的数据类型转化为sqlite3的数据类型
+// DataType 将 go 的数据类型转化为 sqlite3 的数据类型
 func (s *sqlite3) DataType(typ reflect.Value) string {
 	switch typ.Kind() {
 	case reflect.Bool:
@@ -39,13 +37,32 @@ func (s *sqlite3) DataType(typ reflect.Value) string {
 			return "datetime"
 		}
 	}
-
 	panic(fmt.Sprintf("invalid sql type %s (%s) ", typ.Type().Name(), typ.Kind()))
 }
 
-// TableExistSql 生成表是否存在的sql语句
-// 因为每个数据库判断表存在的语句不同
+// TableExistSql 生成表是否存在的 sql 语句
 func (s *sqlite3) TableExistSql(tableName string) (string, []interface{}) {
 	args := []interface{}{tableName}
 	return "SELECT name FROM sqlite_master WHERE type = 'table' and name = ?", args
 }
+
+// TableColumnsSql 查询 sqlite 表现有列名和类型
+// 第一列：列名；第二列：列类型
+func (s *sqlite3) TableColumnsSql(tableName string) (string, []interface{}) {
+	// PRAGMA 不支持占位符，表名拼接；表名来自 Model，可信
+	return "SELECT name, type FROM pragma_table_info('" + tableName + "')", nil
+}
+
+// AlterColumnSql sqlite 不支持直接修改列类型，SupportsAlterColumn 返回 false
+// 这里保留占位实现
+func (s *sqlite3) AlterColumnSql(tableName, column, newType string) string {
+	return ""
+}
+
+// DropColumnSql sqlite 3.35+ 支持 DROP COLUMN
+func (s *sqlite3) DropColumnSql(tableName, column string) string {
+	return fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", tableName, column)
+}
+
+// SupportsAlterColumn sqlite 不支持修改列类型
+func (s *sqlite3) SupportsAlterColumn() bool { return false }

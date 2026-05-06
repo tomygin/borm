@@ -2,8 +2,6 @@ package session
 
 import (
 	"reflect"
-
-	"github.com/tomygin/borm/log"
 )
 
 const (
@@ -17,37 +15,42 @@ const (
 	AfterInsert  = "AfterInsert"
 )
 
-// CallMethod会调用Before,After系列的方法
-// 如果value为nil调用的对象就是当前数据库的那个对象
-// 否者是value对象作为调用的对象
+// CallMethod 会调用 Before, After 系列的钩子方法
+// value 为 nil 时调用表 Model 自身的方法，否则调用 value 的方法
+//
+// 钩子函数签名: func (x *T) BeforeQuery(s *Session) error
+// 只要返回的 error 不为 nil，就会自动终止后续 SQL 执行。
+//
+// 钩子函数默认开启，无需额外开关。
 func (s *Session) CallMethod(method string, value interface{}) {
-
-	if !s.EnableHook {
+	// 若先前的钩子已经返回错误，则跳过后续所有钩子
+	if s.hookErr != nil {
 		return
 	}
 
-	//找到当前表 结构体 的 method 方法
+	if s.refTable == nil {
+		return
+	}
+
+	// 找到当前表结构体的 method 方法
 	fm := reflect.ValueOf(s.RefTable().Model).MethodByName(method)
 
-	//如果有自定义结构体就不用表结构体
+	// 如果有自定义对象则优先在它上面查找
 	if value != nil {
 		fm = reflect.ValueOf(value).MethodByName(method)
 	}
 
-	param := []reflect.Value{reflect.ValueOf(s)}
-
-	if fm.IsValid() {
-		if v := fm.Call(param); len(v) > 0 {
-			if err, ok := v[0].Interface().(error); ok {
-				// panic(err)
-				log.Error(err)
-			}
-		}
+	if !fm.IsValid() {
+		return
 	}
 
+	param := []reflect.Value{reflect.ValueOf(s)}
+	ret := fm.Call(param)
+	if len(ret) == 0 {
+		return
+	}
+	if err, ok := ret[0].Interface().(error); ok && err != nil {
+		// 一旦钩子返回错误，记录下来，后续 SQL 将自动终止
+		s.hookErr = err
+	}
 }
-
-// 在hook中如果执行失败可以调用来结束hook后相关的 增删查改
-// func (s *Session) Abort() {
-// 	s.abort = true
-// }

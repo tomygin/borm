@@ -3,37 +3,34 @@ package session
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/tomygin/borm/clause"
 	"github.com/tomygin/borm/dialect"
-	"github.com/tomygin/borm/log"
 	"github.com/tomygin/borm/schema"
 )
 
+// Session 是一次会话
+// 钩子函数默认开启，若钩子返回非 nil 的 error，则后续 SQL 自动终止
 type Session struct {
-	db      *sql.DB //从engine那里获取来
+	db      *sql.DB //从 engine 那里获取来
 	sql     strings.Builder
 	sqlVars []interface{}
 
-	dialect dialect.Dialect //适配不同的sql语言
-	clause  clause.Clause   //构造sql语句
+	dialect dialect.Dialect //适配不同的 sql 语言
+	clause  clause.Clause   //构造 sql 语句
 
-	refTable *schema.Schema //不同结构体反射的Schema对象
+	refTable *schema.Schema //不同结构体反射的 Schema 对象
 
-	history strings.Builder //用于记录历史执行了的sql语句
-	tx      *sql.Tx         //事务
+	tx *sql.Tx //事务
 
-	// 在钩子函数中关闭后续操作
-	Abort bool
-	// 开启sql语句历史记录，默认关闭
-	EnableHistory bool
-	// 开启钩子函数，默认关闭
-	EnableHook bool
+	// 钩子函数返回的错误（非 nil 即终止后续 sql 执行）
+	hookErr error
 }
 
-// 为了对事务的支持
-
+// CommonDB 事务与普通连接的公共接口
 type CommonDB interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
@@ -43,7 +40,7 @@ type CommonDB interface {
 var _ CommonDB = (*sql.DB)(nil)
 var _ CommonDB = (*sql.Tx)(nil)
 
-// DB如果有事务就返回 *sql.Tx ，否者返回*sql.DB
+// DB 如果有事务就返回 *sql.Tx，否则返回 *sql.DB
 func (s *Session) DB() CommonDB {
 	if s.tx != nil {
 		return s.tx
@@ -51,7 +48,7 @@ func (s *Session) DB() CommonDB {
 	return s.db
 }
 
-// New生成一个新的Session
+// New 生成一个新的 Session
 func New(db *sql.DB, dialect dialect.Dialect) *Session {
 	return &Session{
 		db:      db,
@@ -59,68 +56,226 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 	}
 }
 
-// Clear将会把一个Session还原为新的Session，但保留基本配置
+// Clear 将会把一个 Session 还原为新的 Session，但保留基本配置
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
 	s.clause = clause.Clause{}
-	s.Abort = false
+	s.hookErr = nil
 }
 
-// Raw将sql语句和变量保存在Session中
+// Raw 将 sql 语句和变量追加到当前会话的 SQL 缓冲区
+// 多次调用会以空格连接，适合在 ORM 无法优雅表达的地方手写/拼接 SQL
+//
+// 使用方式：
+//
+//	s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Run()
+//	s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u)
+//	s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 18).All(&users)
 func (s *Session) Raw(sql string, values ...interface{}) *Session {
-	s.sql.WriteString(sql)
-	s.sql.WriteString(" ")
+	if s.sql.Len() > 0 {
+		// 在片段之间自动加一个空格，避免粘连
+		s.sql.WriteString(" ")
+	}
+	s.sql.WriteString(strings.TrimSpace(sql))
 	s.sqlVars = append(s.sqlVars, values...)
 	return s
 }
 
-// Exec会打印日志，然后执行Session中的sql语句和变量
-// 最后会清理Session中的sql语句和变量
-func (s *Session) Exec() (resout sql.Result, err error) {
+// Exec 执行 Session 中的 sql 语句和变量
+// 执行结束后会清理 Session 中的 sql 缓冲区
+// 若钩子 Hook 返回了 error，则直接返回该错误而不执行
+func (s *Session) Exec() (result sql.Result, err error) {
 	defer s.Clear()
-	if s.Abort {
-		err = errors.New("Abort")
-		log.Error("Abort: ", s.sql.String(), s.sqlVars)
-		return
+	if s.hookErr != nil {
+		return nil, s.hookErr
 	}
-	log.Info(s.sql.String(), s.sqlVars)
-	if s.EnableHistory {
-		s.recordSql(s.sql.String(), s.sqlVars)
-	}
-	if resout, err = s.DB().Exec(s.sql.String(), s.sqlVars...); err != nil {
-		log.Error(err)
-	}
+	result, err = s.DB().Exec(s.sql.String(), s.sqlVars...)
 	return
 }
 
+// QueryRow 查询单行。若钩子返回错误则返回 nil
 func (s *Session) QueryRow() *sql.Row {
 	defer s.Clear()
-	if s.Abort {
-
-		log.Error("Abort: ", s.sql.String(), s.sqlVars)
+	if s.hookErr != nil {
 		return nil
-	}
-	log.Info(s.sql.String(), s.sqlVars)
-	if s.EnableHistory {
-		s.recordSql(s.sql.String(), s.sqlVars)
 	}
 	return s.DB().QueryRow(s.sql.String(), s.sqlVars...)
 }
 
+// QueryRows 查询多行。若钩子返回错误则直接返回该错误
 func (s *Session) QueryRows() (rows *sql.Rows, err error) {
 	defer s.Clear()
-	if s.Abort {
-		err = errors.New("Abort")
-		log.Error("Abort: ", s.sql.String(), s.sqlVars)
-		return
+	if s.hookErr != nil {
+		return nil, s.hookErr
 	}
-	log.Info(s.sql.String(), s.sqlVars)
-	if s.EnableHistory {
-		s.recordSql(s.sql.String(), s.sqlVars)
-	}
-	if rows, err = s.DB().Query(s.sql.String(), s.sqlVars...); err != nil {
-		log.Error(err)
-	}
+	rows, err = s.DB().Query(s.sql.String(), s.sqlVars...)
 	return
+}
+
+// Run 执行写操作，等同于 Exec 但只返回 error，更常用
+// 用法: s.Raw("UPDATE ...").Run()
+func (s *Session) Run() error {
+	_, err := s.Exec()
+	return err
+}
+
+// Get 查询并把单条记录写入 dest
+//
+// 两种使用模式（自动判断）：
+//
+//  1. ORM 模式（缓冲区为空时）
+//     s.Model(&User{}).Where("Name = ?", "tomygin").Get(&u)
+//
+//  2. Raw 模式（缓冲区已有 SQL 时）
+//     s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u)
+//     s.Raw("SELECT COUNT(*) FROM User").Get(&count)
+//
+// dest 支持：
+//   - 结构体指针：按列名匹配字段（大小写不敏感）
+//   - 基础类型指针：*int / *string / *float64 等
+func (s *Session) Get(dest interface{}) error {
+	// ORM 模式：自动触发钩子并构造 SELECT
+	ormMode := !s.hasRaw()
+	if ormMode {
+		s.CallMethod(BeforeQuery, nil)
+		defer s.CallMethod(AfterQuery, s.refTable.Model)
+
+		// 如果用户传入的是结构体指针且没有 Model，就用它当 Model
+		if s.refTable == nil {
+			dv := reflect.ValueOf(dest)
+			if dv.Kind() == reflect.Ptr && dv.Elem().Kind() == reflect.Struct {
+				s.Model(reflect.New(dv.Elem().Type()).Interface())
+			}
+		}
+		sqlStr, vars := s.buildSelect(nil)
+		// 对 ORM 模式统一 Limit 1
+		s.Raw(sqlStr, vars...)
+		// 重新补上 LIMIT 1（Build 时 LIMIT 可能未设置）
+		// 这里简单处理：若原 sql 中没有 LIMIT，则追加
+		if !strings.Contains(strings.ToUpper(sqlStr), "LIMIT") {
+			s.sql.WriteString(" LIMIT 1")
+		}
+	}
+
+	rows, err := s.QueryRows()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return sql.ErrNoRows
+	}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	return scanInto(rows, cols, dest)
+}
+
+// All 查询并把多条记录写入 dest
+//
+// 两种使用模式（自动判断）：
+//
+//  1. ORM 模式（缓冲区为空时）
+//     s.Model(&User{}).Where("Age > ?", 10).All(&users)
+//
+//  2. Raw 模式（缓冲区已有 SQL 时）
+//     s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 10).All(&users)
+//
+// dest 必须是切片指针：
+//   - *[]Struct
+//   - *[]基础类型
+func (s *Session) All(dest interface{}) error {
+	destV := reflect.ValueOf(dest)
+	if destV.Kind() != reflect.Ptr || destV.Elem().Kind() != reflect.Slice {
+		return errors.New("All: dest must be a pointer to a slice")
+	}
+	sliceV := destV.Elem()
+	elemT := sliceV.Type().Elem()
+
+	ormMode := !s.hasRaw()
+	if ormMode {
+		// 自动触发钩子
+		s.CallMethod(BeforeQuery, nil)
+		defer s.CallMethod(AfterQuery, s.refTable.Model)
+
+		// 若还没 Model，用切片元素类型当 Model
+		if s.refTable == nil && elemT.Kind() == reflect.Struct {
+			s.Model(reflect.New(elemT).Interface())
+		}
+		sqlStr, vars := s.buildSelect(nil)
+		s.Raw(sqlStr, vars...)
+	}
+
+	rows, err := s.QueryRows()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		elemPtr := reflect.New(elemT)
+		if err := scanInto(rows, cols, elemPtr.Interface()); err != nil {
+			return err
+		}
+		sliceV.Set(reflect.Append(sliceV, elemPtr.Elem()))
+	}
+	return rows.Err()
+}
+
+// scanInto 将 rows 当前行的数据写入 dest
+// dest 可以是 *struct 或 *基础类型
+func scanInto(rows *sql.Rows, cols []string, dest interface{}) error {
+	destV := reflect.ValueOf(dest)
+	if destV.Kind() != reflect.Ptr || destV.IsNil() {
+		return errors.New("scan target must be a non-nil pointer")
+	}
+	elem := destV.Elem()
+
+	switch elem.Kind() {
+	case reflect.Struct:
+		// 按列名匹配结构体字段（大小写不敏感）
+		scanArgs := make([]interface{}, len(cols))
+		holders := make([]interface{}, len(cols)) // 兜底丢弃
+		for i, col := range cols {
+			f := findFieldByName(elem, col)
+			if f.IsValid() && f.CanAddr() {
+				scanArgs[i] = f.Addr().Interface()
+			} else {
+				var placeholder interface{}
+				holders[i] = &placeholder
+				scanArgs[i] = holders[i]
+			}
+		}
+		return rows.Scan(scanArgs...)
+
+	default:
+		// 基础类型
+		if len(cols) != 1 {
+			return fmt.Errorf("scan into %s expects 1 column, got %d", elem.Kind(), len(cols))
+		}
+		return rows.Scan(dest)
+	}
+}
+
+// findFieldByName 在结构体中根据列名找字段（忽略大小写）
+func findFieldByName(structV reflect.Value, name string) reflect.Value {
+	t := structV.Type()
+	lname := strings.ToLower(name)
+	for i := 0; i < t.NumField(); i++ {
+		if strings.ToLower(t.Field(i).Name) == lname {
+			return structV.Field(i)
+		}
+	}
+	return reflect.Value{}
 }

@@ -1,14 +1,13 @@
 package session
 
 import (
-	"errors"
 	"reflect"
 
 	"github.com/tomygin/borm/clause"
 )
 
+// Insert 插入一条或多条记录
 func (s *Session) Insert(values ...interface{}) (int64, error) {
-
 	s.CallMethod(BeforeInsert, nil)
 	defer s.CallMethod(AfterInsert, nil)
 
@@ -28,39 +27,8 @@ func (s *Session) Insert(values ...interface{}) (int64, error) {
 	return resout.RowsAffected()
 }
 
-func (s *Session) Find(values interface{}) error {
-
-	s.CallMethod(BeforeQuery, nil)
-
-	defer s.CallMethod(AfterQuery, s.refTable.Model)
-
-	destSlice := reflect.Indirect(reflect.ValueOf(values))
-	destType := destSlice.Type().Elem()
-	table := s.Model(reflect.New(destType).Elem().Interface()).RefTable()
-
-	s.clause.Set(clause.SELECT, table.Name, table.FieldNames)
-	sql, vars := s.clause.Build(clause.SELECT, clause.WHERE, clause.ORDERBY, clause.LIMIT, clause.OFFSET)
-	rows, err := s.Raw(sql, vars...).QueryRows()
-	if err != nil {
-		return err
-	}
-
-	for rows.Next() {
-		dest := reflect.New(destType).Elem()
-		var values []interface{}
-		for _, name := range table.FieldNames {
-			values = append(values, dest.FieldByName(name).Addr().Interface())
-		}
-		if err := rows.Scan(values...); err != nil {
-			return err
-		}
-		destSlice.Set(reflect.Append(destSlice, dest))
-	}
-	return rows.Close()
-}
-
+// Update 更新匹配行
 func (s *Session) Update(kv ...interface{}) (int64, error) {
-
 	s.CallMethod(BeforeUpdate, nil)
 	defer s.CallMethod(AfterUpdate, nil)
 
@@ -80,8 +48,8 @@ func (s *Session) Update(kv ...interface{}) (int64, error) {
 	return result.RowsAffected()
 }
 
+// Delete 删除匹配行
 func (s *Session) Delete() (int64, error) {
-
 	s.CallMethod(BeforeDelete, nil)
 	defer s.CallMethod(AfterDelete, nil)
 
@@ -94,6 +62,7 @@ func (s *Session) Delete() (int64, error) {
 	return result.RowsAffected()
 }
 
+// Count 返回满足条件的行数
 func (s *Session) Count() (int64, error) {
 	s.clause.Set(clause.COUNT, s.RefTable().Name)
 	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
@@ -102,50 +71,49 @@ func (s *Session) Count() (int64, error) {
 	var tmp int64
 	err := row.Scan(&tmp)
 	return tmp, err
-
 }
 
+// Limit 限制返回条数
 func (s *Session) Limit(num int) *Session {
 	s.clause.Set(clause.LIMIT, num)
 	return s
 }
 
-// 用于跳过多少条数据
-func (s *Session) OFFSET(num int) *Session {
+// Offset 跳过多少条数据
+func (s *Session) Offset(num int) *Session {
 	s.clause.Set(clause.OFFSET, num)
 	return s
 }
 
-// Page仅仅是limit和offset的封装
-func (s *Session) Page(limit, offset int) *Session {
-	s.Limit(limit)
-	s.OFFSET(offset)
-	return s
-}
-
+// Where 设置 WHERE 子句
 func (s *Session) Where(desc string, args ...interface{}) *Session {
 	var vars []interface{}
 	s.clause.Set(clause.WHERE, append(append(vars, desc), args...)...)
 	return s
 }
 
+// OrderBy 设置 ORDER BY 子句
 func (s *Session) OrderBy(desc string) *Session {
 	s.clause.Set(clause.ORDERBY, desc)
 	return s
 }
 
-func (s *Session) First(value interface{}) error {
-
-	dest := reflect.Indirect(reflect.ValueOf(value))
-	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
-
-	//内嵌一个Find，所以这里如果埋了Hook将会有重复hook
-	if err := s.Limit(1).Find(destSlice.Addr().Interface()); err != nil {
-		return err
+// buildSelect 根据当前 Session 的 Model 与 clause 构造 SELECT 语句
+// 返回 (sql, vars, table)，table 为对应 Schema，便于按字段顺序 Scan
+func (s *Session) buildSelect(model interface{}) (string, []interface{}) {
+	if model != nil {
+		s.Model(model)
 	}
-	if destSlice.Len() == 0 {
-		return errors.New("NOT FOUND")
-	}
-	dest.Set(destSlice.Index(0))
-	return nil
+	table := s.RefTable()
+	s.clause.Set(clause.SELECT, table.Name, table.FieldNames)
+	sqlStr, vars := s.clause.Build(clause.SELECT, clause.WHERE, clause.ORDERBY, clause.LIMIT, clause.OFFSET)
+	return sqlStr, vars
 }
+
+// hasRaw 判断当前 Session 的 SQL 缓冲区是否已经有内容（代表处于 Raw 模式）
+func (s *Session) hasRaw() bool {
+	return s.sql.Len() > 0
+}
+
+// _ 用于避免 reflect 导入被 linter 识别为未使用（其他文件已用，这里兜底）
+var _ = reflect.TypeOf

@@ -16,38 +16,56 @@ func init() {
 	RegisterDialect("mysql", &mysql{})
 }
 
+// DataType 将 go 类型转为 mysql 类型
 func (m *mysql) DataType(typ reflect.Value) string {
 	switch typ.Kind() {
 	case reflect.Bool:
-		return "tinyint(1)" // MySQL 通常用 tinyint(1) 表示布尔
+		return "tinyint(1)"
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
-		return "int" // 32位整数
+		return "int"
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32:
-		return "int unsigned" // 无符号32位整数
+		return "int unsigned"
 	case reflect.Int64:
-		return "bigint" // 64位整数
+		return "bigint"
 	case reflect.Uint64:
-		return "bigint unsigned" // 无符号64位整数
+		return "bigint unsigned"
 	case reflect.Float32:
-		return "float" // 单精度浮点数
+		return "float"
 	case reflect.Float64:
-		return "double" // 双精度浮点数
+		return "double"
 	case reflect.String:
-		return "varchar(255)" // 默认字符串长度
+		return "varchar(255)"
 	case reflect.Array, reflect.Slice:
-		return "blob" // 二进制数据
+		return "blob"
 	case reflect.Struct:
 		if _, ok := typ.Interface().(time.Time); ok {
-			return "datetime" // 时间类型
+			return "datetime"
 		}
 	}
-
 	panic(fmt.Sprintf("invalid sql type %s (%s)", typ.Type().Name(), typ.Kind()))
 }
 
-// 修正后的表存在判断语句
+// TableExistSql 表是否存在
 func (m *mysql) TableExistSql(tableName string) (string, []interface{}) {
 	args := []interface{}{tableName}
-	// 使用 MySQL 的 information_schema 系统表
 	return "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", args
 }
+
+// TableColumnsSql 查询列名和类型
+func (m *mysql) TableColumnsSql(tableName string) (string, []interface{}) {
+	args := []interface{}{tableName}
+	return "SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", args
+}
+
+// AlterColumnSql 修改列类型
+func (m *mysql) AlterColumnSql(tableName, column, newType string) string {
+	return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s", tableName, column, newType)
+}
+
+// DropColumnSql 删除列
+func (m *mysql) DropColumnSql(tableName, column string) string {
+	return fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", tableName, column)
+}
+
+// SupportsAlterColumn mysql 支持修改列类型
+func (m *mysql) SupportsAlterColumn() bool { return true }

@@ -2,12 +2,11 @@
 
 ## Borm 介绍
 
-这是一款轻量级的 ORM 库，还在递归更新中，相信你能 3 分钟内上手，默认使用 Sqlite3
-数据库。
+**一个用一条 DSN 就能跑起来的轻量 Go ORM，自动同步表结构、钩子默认开启、ORM 与 Raw 接口完全统一。**
 
 ## 安装最新版
 
-```go
+```bash
 go get -u github.com/tomygin/borm@latest
 ```
 
@@ -17,8 +16,9 @@ go get -u github.com/tomygin/borm@latest
 package main
 
 import (
+	"fmt"
+
 	"github.com/tomygin/borm"
-	"github.com/tomygin/borm/log"
 	"github.com/tomygin/borm/session"
 )
 
@@ -28,146 +28,136 @@ type User struct {
 }
 
 func main() {
-	engine, _ := borm.NewEngine("test.db")
+
+// 只需要 DSN，自动识别数据库类型
+	// sqlite:   "test.db"  或  "sqlite://test.db"
+	// mysql:    "root:root@tcp(127.0.0.1:3306)/test"
+	// postgres: "postgres://user:pass@127.0.0.1:5432/test?sslmode=disable"
+
+engine, err := borm.NewEngine("test.db")
+	if err != nil {
+		panic(err)
+	}
 	defer engine.Close()
 
 	s := engine.NewSession().Model(&User{})
 
-	// 开启钩子函数
-	s.EnableHook = true
-	// 增删表
-	s.CreateTable()
-	defer s.DropTable()
+	// 自动同步表结构（建表 / 加列 / 改类型 / 删除多余列）
+	_ = s.Sync()
 
-	// 判断表存在
-	if s.IsExistTable() {
-		log.Info("表存在")
-	}
-
-	// 插入操作
-	if affect, err := s.Insert(
+	// 插入
+	_, _ = s.Insert(
 		&User{Name: "tomygin", Age: 20},
 		&User{Name: "ice", Age: 19},
-		&User{Name: "test", Age: 18},
-		&User{Name: "t0", Age: 100},
-		&User{Name: "t1", Age: 101},
-		&User{Name: "t2", Age: 102},
-		&User{Name: "t3", Age: 103},
-		&User{Name: "t4", Age: 104},
-		&User{Name: "t5", Age: 105},
-		&User{Name: "t6", Age: 106}); err == nil {
-		log.Info("成功插入", affect, "条数据")
-	}
+	)
 
-	// 单条查询
-	tmp := User{}
-	if err := s.Where("Name = ?", "tomygin").First(&tmp); err != nil {
-		log.Error(err)
-	}
 
-	// 多条查询
-	tmps := []User{}
-	if err := s.Where("Age > 10").Find(&tmps); err == nil {
-		log.Info("拿到数据", tmps)
-	}
+	var u User
+	_ = s.Where("Name = ?", "tomygin").Get(&u)
 
-	// 分页查询
-	// Page 仅仅是封装了 Limit 和 Offset
-	if err := s.Where("Age > 10").Page(1, 2).Find(&tmps); err == nil {
-		log.Info("分页查询到数据", tmps)
-	}
+	var list []User
+	_ = s.Where("Age > ?", 10).Limit(10).Offset(0).All(&list)
 
-	// 删除
-	if _, err := s.Where("Age = ?", 18).Limit(1).Delete(); err != nil {
-		log.Error(err)
-	}
+	// Raw 风格 取一条 / 取多条 / 单值 / 基础类型切片
+	var u2 User
+	_ = s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u2)
 
-	// 更新
-	s.Where("Name = ?", "tomygin").Update("Age", 18)
+	var users []User
+	_ = s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 10).All(&users)
 
-	// 查看更新
-	s.Where("Name = ?", "tomygin").First(&tmp)
-	log.Info(tmp)
+	var count int
+	_ = s.Raw("SELECT COUNT(*) FROM User").Get(&count)
 
-	// 排序查找最小年龄
-	s.OrderBy("Age DESC").First(&tmp)
-	log.Info(tmp)
+	var names []string
+	_ = s.Raw("SELECT Name FROM User").All(&names)
+	fmt.Println(names)
 
-	// 执行原生SQL
-	s.Raw("INSERT INTO User (`Name`)  VALUES (?) ", "RAW").Exec()
+	// 写操作
+	_ = s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Run()
 
-	// 一键事务，失败自动回滚
+	// ORM 更新 / 删除
+	_, _ = s.Where("Name = ?", "tomygin").Update("Age", 21)
+	_, _ = s.Where("Age = ?", 19).Limit(1).Delete()
+
+	// 事务：失败自动回滚
 	r, err := engine.Transaction(func(s *session.Session) (interface{}, error) {
-		// s 是新的会话，先前对外部会话的设置对此会话无效，如有需要请重新设置
 		s.Model(&User{})
-		s.CreateTable()
-		s.Insert(&User{Name: "tomygin"})
+		_ = s.Sync()
+		_, _ = s.Insert(&User{Name: "tx_user", Age: 1})
 		t := User{}
-		err := s.Where("Name = ?", "tomygin").First(&t)
-		return t, err
+		return t, s.Where("Name = ?", "tx_user").Get(&t)
 	})
-	log.Info(r, err)
-
-	// session的sql历史记录
-	history := s.History()
-	log.Info(history)
-
-	// 日志分级
-	log.SetLevel(log.ErrorLevel)
-
+	fmt.Println(r, err)
 }
 
-// 钩子函数
+// 钩子函数默认开启
+// 只要返回的 error 不为 nil，就会自动终止后续 SQL 执行
 func (u *User) BeforeQuery(s *session.Session) error {
-	log.Info("钩子函数运行成功")
-
-	// 不希望最后执行sql
-	s.Abort = true
-
 	return nil
 }
-
 ```
+
+### 可用的钩子函数
 
 ```go
-// 可用的钩子函数
-BeforeQuery
-AfterQuery
-BeforeUpdate
-AfterUpdate
-BeforeDelete
-AfterDelete
-BeforeInsert
-AfterInsert
+BeforeQuery  / AfterQuery
+BeforeUpdate / AfterUpdate
+BeforeDelete / AfterDelete
+BeforeInsert / AfterInsert
 ```
 
-## 必要说明
+### DSN 识别规则
 
-1. 历史记录默认关闭，如果需要打开请在你的代码里面添加` s.EnableHistory = true`。
-2. 钩子函数默认关闭，如果需要打开请在你的代码里面添加` s.EnableHook = true`。
+| DSN 示例                                            | 解析出的驱动 |
+| --------------------------------------------------- | ------------ |
+| `postgres://user:pass@host:5432/db?sslmode=disable` | `pgx`        |
+| `postgresql://user:pass@host:5432/db`               | `pgx`        |
+| `host=127.0.0.1 user=xx password=xx dbname=xx`      | `pgx`        |
+| `mysql://user:pass@tcp(host:3306)/db`               | `mysql`      |
+| `user:pass@tcp(host:3306)/db`                       | `mysql`      |
+| `sqlite://path/to/file.db` / `sqlite3://file.db`    | `sqlite`     |
+| `file:xxx.db`                                       | `sqlite`     |
+| `path/to/file.db` / `*.sqlite` / `*.sqlite3`        | `sqlite`     |
+
+### 统一的 Get / All / Run
+
+ORM 和 Raw 共享同一套终结方法；根据是否调用过 `Raw(...)` 自动选择模式：
+
+| 方法                     | ORM 模式             | Raw 模式                                     |
+| ------------------------ | -------------------- | -------------------------------------------- |
+| `s.Where(...).Get(&x)`   | 取一条到 `*Struct`   | ——                                           |
+| `s.Where(...).All(&xs)`  | 取多条到 `*[]Struct` | ——                                           |
+| `s.Raw(sql...).Get(&x)`  | ——                   | 取一条，`*Struct` 或 `*int / *string / ...`  |
+| `s.Raw(sql...).All(&xs)` | ——                   | 取多条，`*[]Struct` 或 `*[]int / *[]string`  |
+| `s.Raw(sql...).Run()`    | ——                   | 执行写操作（INSERT / UPDATE / DELETE / DDL） |
+
+结构体按列名匹配字段，忽略大小写。多段 `Raw` 可链式拼接，之间自动以空格连接：
+
+```go
+s.Raw("SELECT Name, Age FROM User").
+  Raw("WHERE Age BETWEEN ? AND ?", 10, 30).
+  Raw("ORDER BY Age DESC").
+  All(&users)
+```
+
+### Sync 自动同步表结构
+
+`Sync()` 会对比 Model 与数据库中的真实表结构：
+
+| 情况                   | 处理方式                                       |
+| ---------------------- | ---------------------------------------------- |
+| 表不存在               | 自动 `CREATE TABLE`                            |
+| Model 新增的列         | 自动 `ALTER TABLE ADD COLUMN`                  |
+| 列类型发生变更         | 自动 `ALTER TABLE MODIFY/ALTER COLUMN`（见下） |
+| Model 中已经不存在的列 | 自动 `ALTER TABLE DROP COLUMN`                 |
+
+> 说明：SQLite 仅支持加列/删列（3.35+），不支持直接修改列类型-元素亲和，`Sync` 会跳过类型变更。MySQL / PostgreSQL 三种变更都支持。
 
 ## 未来计划
 
--   [x] 支持钩子函数
--   [x] 事务提交
--   [x] 选项初始化
--   [x] 分页
--   [x] 钩子函数终止后续操作
--   [x] 自动记录执行的 sql 语句
--   [x] 异步插入
--   [x] 爬虫数据缓冲保存
--   [ ] ~~从新实现注册回调函数~~
--   [x] 支持 mysql
--   [ ] 新的日志库
-
-## borm 日志
-
--   2024 年 04 月 24 日 根据阮一峰的文档标准修改 README。
--   2023 年 12 月 1 日 暂时归档。
--   2023 年 11 月 20 日 去除不必要的选项卡初始化。
--   2023 年 11 月 6 日 由 Box 更名为 Borm ，去除 cache。
-
-## License
-
-Borm learn from [GEEKTUTU](https://geektutu.com/post/geeorm.html) released under
-the [MIT-License](./LICENSE)
+- [x] 支持钩子函数（默认开启，返回 error 自动终止）
+- [x] 事务提交
+- [x] 支持 mysql / postgres / sqlite
+- [x] 内置驱动，DSN 自动识别
+- [x] `Sync` 自动同步表结构（建表 + 加列 + 改类型 + 删列）
+- [x] 简洁且统一的 Get / All / Run 接口
