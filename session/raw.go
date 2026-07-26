@@ -69,7 +69,7 @@ func (s *Session) Clear() {
 //
 // 使用方式：
 //
-//	s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Run()
+//	s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Query()
 //	s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Query(&u)
 //	s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 18).Query(&users)
 func (s *Session) Raw(sql string, values ...interface{}) *Session {
@@ -113,44 +113,47 @@ func (s *Session) queryRows() (rows *sql.Rows, err error) {
 	return
 }
 
-// Run 执行写操作，只返回 error
-// 用法: s.Raw("UPDATE ...").Run()
-func (s *Session) Run() error {
-	_, err := s.exec()
-	return err
-}
-
-// Query 查询记录并写入 dest，根据 dest 的反射类型自动判别取一条还是取多条：
+// Query 是统一的终结方法，根据传入参数自动决定行为：
 //
-//   - dest 为切片指针 *[]T      → 取多条
-//   - dest 为其它指针 *Struct / *基础类型 → 取一条
+//  1. 不传参数 → 执行写操作（INSERT / UPDATE / DELETE / DDL），只返回 error
+//     s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "x").Query()
+//     s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "a", 1).Query()
 //
-// 两种使用模式（同样自动判断）：
+//  2. 传入切片指针 *[]T → 取多条
+//     s.Where("Age > ?", 10).Query(&users)
+//     s.Raw("SELECT Name, Age FROM User").Query(&users)
 //
-//  1. ORM 模式（缓冲区为空时）
-//     s.Model(&User{}).Where("Name = ?", "tomygin").Query(&u)     // 取一条
-//     s.Model(&User{}).Where("Age > ?", 10).Query(&users)          // 取多条
+//  3. 传入其它指针 *Struct / *基础类型 → 取一条
+//     s.Where("Name = ?", "tomygin").Query(&u)
+//     s.Raw("SELECT COUNT(*) FROM User").Query(&count)
 //
-//  2. Raw 模式（缓冲区已有 SQL 时）
-//     s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "x").Query(&u)   // 取一条
-//     s.Raw("SELECT COUNT(*) FROM User").Query(&count)                    // 取一条
-//     s.Raw("SELECT Name, Age FROM User").Query(&users)                   // 取多条
+// 查询时 ORM / Raw 两种模式同样自动判断（是否调用过 Raw）。
 //
 // dest 支持：
 //   - 切片指针：*[]Struct 或 *[]基础类型
 //   - 结构体指针：按列名匹配字段（大小写不敏感）
 //   - 基础类型指针：*int / *string / *float64 等
-func (s *Session) Query(dest interface{}) error {
-	destV := reflect.ValueOf(dest)
+func (s *Session) Query(dest ...interface{}) error {
+	// 不带参数：执行写操作
+	if len(dest) == 0 {
+		_, err := s.exec()
+		return err
+	}
+	if len(dest) > 1 {
+		return errors.New("Query: expects at most one dest argument")
+	}
+
+	d := dest[0]
+	destV := reflect.ValueOf(d)
 	if destV.Kind() != reflect.Ptr || destV.IsNil() {
 		return errors.New("Query: dest must be a non-nil pointer")
 	}
 
 	// 根据 dest 的反射类型自动判别：切片指针取多条，否则取一条
 	if destV.Elem().Kind() == reflect.Slice {
-		return s.queryAll(dest)
+		return s.queryAll(d)
 	}
-	return s.queryOne(dest)
+	return s.queryOne(d)
 }
 
 // queryOne 查询并把单条记录写入 dest（Query 的取一条实现）

@@ -89,7 +89,7 @@ func main() {
 	title("Sync (自动建表/加列/改类型/删除多余列)")
 
 	// 先手动创建一个"旧"表：只有 Name 列、还多了一个 OldCol
-	_ = s.Raw("CREATE TABLE User (Name text, OldCol text)").Run()
+	_ = s.Raw("CREATE TABLE User (Name text, OldCol text)").Query()
 
 	// 用新 Model Sync 一下，预期列变为 [Name, Age]（OldCol 被删，Age 被加）
 	if err := s.Model(&User{}).Sync(); err != nil {
@@ -143,13 +143,13 @@ func main() {
 	fmt.Println("Count:", total)
 
 	// ======================================================
-	// 5) Raw 系列：Raw / Run / Query
-	//    Query 同样根据 dest 反射类型自动判别取一条/取多条
+	// 5) Raw 系列：Raw / Query
+	//    Query 不带参数 = 执行写操作；带参数按反射类型取一条/取多条
 	// ======================================================
-	title("Raw + Run / Query")
+	title("Raw + Query")
 
-	// Run：写操作
-	_ = s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "raw_a", 100).Run()
+	// Query 不带参数：写操作
+	_ = s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "raw_a", 100).Query()
 
 	// Raw + Query 到结构体（*Struct → 取一条）
 	var u2 User
@@ -180,16 +180,14 @@ func main() {
 	fmt.Println("Raw 链式 Query:", filtered)
 
 	// ======================================================
-	// 6) Session 杂项：DB / Clear
+	// 6) Session 杂项：Clear
 	// ======================================================
-	title("DB / Clear")
+	title("Clear")
 
-	// DB 返回底层 *sql.DB (或事务里的 *sql.Tx)
-	_ = s.DB() // session.CommonDB
-
-	// Clear 手动清空缓冲区（一般不用调，执行类方法会自动调）
+	// Clear 手动清空 SQL 缓冲区（一般无需手动调用，终结方法执行后会自动清理）
 	s.Raw("SELECT 1")
 	s.Clear()
+	fmt.Println("Clear 完成，缓冲区已重置")
 
 	// ======================================================
 	// 7) 事务：Engine.Transaction（高层）或 Begin/Commit/RollBack（底层）
@@ -213,7 +211,7 @@ func main() {
 	})
 	fmt.Println("Transaction rollback:", r2, err2)
 
-	// 验证 tx_bad 已回滚：Get 返回 sql.ErrNoRows 表示找不到
+	// 验证 tx_bad 已回滚：Query 取一条时查不到会返回 sql.ErrNoRows
 	var miss User
 	err3 := s.Where("Name = ?", "tx_bad").Query(&miss)
 	fmt.Println("tx_bad 已回滚（查不到）:", errors.Is(err3, sql.ErrNoRows))
@@ -230,18 +228,16 @@ func main() {
 	}
 
 	// ======================================================
-	// 8) session.New（底层构造）& CommonDB 接口
+	// 8) 底层接口：Session.DB / CommonDB
 	// ======================================================
-	title("session.New / CommonDB")
+	title("DB / CommonDB")
 
-	rawDB, _ := sql.Open("sqlite", dbFile)
-	// 需要一个 dialect，可以从 engine 那边"借"出来，这里演示最直白的用法
-	// 直接从另一个 NewSession 的 s.DB() 得到 CommonDB 已经够用，
-	// 真实项目不建议绕过 borm.NewEngine 使用。
-	_ = rawDB
-
-	// session.CommonDB 本身就是接口，*sql.DB / *sql.Tx 都满足
-	var _ session.CommonDB = engine.NewSession().DB()
+	// DB() 返回底层执行器：无事务时是 *sql.DB，事务中是 *sql.Tx，
+	// 二者都满足 session.CommonDB 接口。需要时可绕过 borm 直接跑原生 database/sql 调用。
+	var db session.CommonDB = s.DB()
+	var raw int
+	_ = db.QueryRow("SELECT COUNT(*) FROM User").Scan(&raw)
+	fmt.Println("via CommonDB COUNT:", raw)
 
 	title("展示完毕")
 }
