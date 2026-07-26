@@ -70,8 +70,8 @@ func (s *Session) Clear() {
 // 使用方式：
 //
 //	s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Run()
-//	s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u)
-//	s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 18).All(&users)
+//	s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Query(&u)
+//	s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 18).Query(&users)
 func (s *Session) Raw(sql string, values ...interface{}) *Session {
 	if s.sql.Len() > 0 {
 		// 在片段之间自动加一个空格，避免粘连
@@ -82,10 +82,10 @@ func (s *Session) Raw(sql string, values ...interface{}) *Session {
 	return s
 }
 
-// Exec 执行 Session 中的 sql 语句和变量
+// exec 执行 Session 中的 sql 语句和变量
 // 执行结束后会清理 Session 中的 sql 缓冲区
 // 若钩子 Hook 返回了 error，则直接返回该错误而不执行
-func (s *Session) Exec() (result sql.Result, err error) {
+func (s *Session) exec() (result sql.Result, err error) {
 	defer s.Clear()
 	if s.hookErr != nil {
 		return nil, s.hookErr
@@ -94,8 +94,8 @@ func (s *Session) Exec() (result sql.Result, err error) {
 	return
 }
 
-// QueryRow 查询单行。若钩子返回错误则返回 nil
-func (s *Session) QueryRow() *sql.Row {
+// queryRow 查询单行。若钩子返回错误则返回 nil
+func (s *Session) queryRow() *sql.Row {
 	defer s.Clear()
 	if s.hookErr != nil {
 		return nil
@@ -103,8 +103,8 @@ func (s *Session) QueryRow() *sql.Row {
 	return s.DB().QueryRow(s.sql.String(), s.sqlVars...)
 }
 
-// QueryRows 查询多行。若钩子返回错误则直接返回该错误
-func (s *Session) QueryRows() (rows *sql.Rows, err error) {
+// queryRows 查询多行。若钩子返回错误则直接返回该错误
+func (s *Session) queryRows() (rows *sql.Rows, err error) {
 	defer s.Clear()
 	if s.hookErr != nil {
 		return nil, s.hookErr
@@ -113,33 +113,53 @@ func (s *Session) QueryRows() (rows *sql.Rows, err error) {
 	return
 }
 
-// Run 执行写操作，等同于 Exec 但只返回 error，更常用
+// Run 执行写操作，只返回 error
 // 用法: s.Raw("UPDATE ...").Run()
 func (s *Session) Run() error {
-	_, err := s.Exec()
+	_, err := s.exec()
 	return err
 }
 
-// Get 查询并把单条记录写入 dest
+// Query 查询记录并写入 dest，根据 dest 的反射类型自动判别取一条还是取多条：
 //
-// 两种使用模式（自动判断）：
+//   - dest 为切片指针 *[]T      → 取多条
+//   - dest 为其它指针 *Struct / *基础类型 → 取一条
+//
+// 两种使用模式（同样自动判断）：
 //
 //  1. ORM 模式（缓冲区为空时）
-//     s.Model(&User{}).Where("Name = ?", "tomygin").Get(&u)
+//     s.Model(&User{}).Where("Name = ?", "tomygin").Query(&u)     // 取一条
+//     s.Model(&User{}).Where("Age > ?", 10).Query(&users)          // 取多条
 //
 //  2. Raw 模式（缓冲区已有 SQL 时）
-//     s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u)
-//     s.Raw("SELECT COUNT(*) FROM User").Get(&count)
+//     s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "x").Query(&u)   // 取一条
+//     s.Raw("SELECT COUNT(*) FROM User").Query(&count)                    // 取一条
+//     s.Raw("SELECT Name, Age FROM User").Query(&users)                   // 取多条
 //
 // dest 支持：
+//   - 切片指针：*[]Struct 或 *[]基础类型
 //   - 结构体指针：按列名匹配字段（大小写不敏感）
 //   - 基础类型指针：*int / *string / *float64 等
-func (s *Session) Get(dest interface{}) error {
+func (s *Session) Query(dest interface{}) error {
+	destV := reflect.ValueOf(dest)
+	if destV.Kind() != reflect.Ptr || destV.IsNil() {
+		return errors.New("Query: dest must be a non-nil pointer")
+	}
+
+	// 根据 dest 的反射类型自动判别：切片指针取多条，否则取一条
+	if destV.Elem().Kind() == reflect.Slice {
+		return s.queryAll(dest)
+	}
+	return s.queryOne(dest)
+}
+
+// queryOne 查询并把单条记录写入 dest（Query 的取一条实现）
+func (s *Session) queryOne(dest interface{}) error {
 	// ORM 模式：自动触发钩子并构造 SELECT
 	ormMode := !s.hasRaw()
 	if ormMode {
-		s.CallMethod(BeforeQuery, nil)
-		defer s.CallMethod(AfterQuery, s.refTable.Model)
+		s.callMethod(beforeQuery, nil)
+		defer s.callMethod(afterQuery, s.refTable.Model)
 
 		// 如果用户传入的是结构体指针且没有 Model，就用它当 Model
 		if s.refTable == nil {
@@ -158,7 +178,7 @@ func (s *Session) Get(dest interface{}) error {
 		}
 	}
 
-	rows, err := s.QueryRows()
+	rows, err := s.queryRows()
 	if err != nil {
 		return err
 	}
@@ -178,23 +198,15 @@ func (s *Session) Get(dest interface{}) error {
 	return scanInto(rows, cols, dest)
 }
 
-// All 查询并把多条记录写入 dest
-//
-// 两种使用模式（自动判断）：
-//
-//  1. ORM 模式（缓冲区为空时）
-//     s.Model(&User{}).Where("Age > ?", 10).All(&users)
-//
-//  2. Raw 模式（缓冲区已有 SQL 时）
-//     s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 10).All(&users)
+// queryAll 查询并把多条记录写入 dest（Query 的取多条实现）
 //
 // dest 必须是切片指针：
 //   - *[]Struct
 //   - *[]基础类型
-func (s *Session) All(dest interface{}) error {
+func (s *Session) queryAll(dest interface{}) error {
 	destV := reflect.ValueOf(dest)
 	if destV.Kind() != reflect.Ptr || destV.Elem().Kind() != reflect.Slice {
-		return errors.New("All: dest must be a pointer to a slice")
+		return errors.New("Query: dest must be a pointer to a slice")
 	}
 	sliceV := destV.Elem()
 	elemT := sliceV.Type().Elem()
@@ -202,8 +214,8 @@ func (s *Session) All(dest interface{}) error {
 	ormMode := !s.hasRaw()
 	if ormMode {
 		// 自动触发钩子
-		s.CallMethod(BeforeQuery, nil)
-		defer s.CallMethod(AfterQuery, s.refTable.Model)
+		s.callMethod(beforeQuery, nil)
+		defer s.callMethod(afterQuery, s.refTable.Model)
 
 		// 若还没 Model，用切片元素类型当 Model
 		if s.refTable == nil && elemT.Kind() == reflect.Struct {
@@ -213,7 +225,7 @@ func (s *Session) All(dest interface{}) error {
 		s.Raw(sqlStr, vars...)
 	}
 
-	rows, err := s.QueryRows()
+	rows, err := s.queryRows()
 	if err != nil {
 		return err
 	}

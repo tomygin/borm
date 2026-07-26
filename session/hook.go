@@ -4,25 +4,27 @@ import (
 	"reflect"
 )
 
+// 钩子方法名常量（仅内部分发使用）
+// 用户只需在自己的模型上实现同名方法即可，无需引用这些常量。
 const (
-	BeforeQuery  = "BeforeQuery"
-	AfterQuery   = "AfterQuery"
-	BeforeUpdate = "BeforeUpdate"
-	AfterUpdate  = "AfterUpdate"
-	BeforeDelete = "BeforeDelete"
-	AfterDelete  = "AfterDelete"
-	BeforeInsert = "BeforeInsert"
-	AfterInsert  = "AfterInsert"
+	beforeQuery  = "BeforeQuery"
+	afterQuery   = "AfterQuery"
+	beforeUpdate = "BeforeUpdate"
+	afterUpdate  = "AfterUpdate"
+	beforeDelete = "BeforeDelete"
+	afterDelete  = "AfterDelete"
+	beforeInsert = "BeforeInsert"
+	afterInsert  = "AfterInsert"
 )
 
-// CallMethod 会调用 Before, After 系列的钩子方法
+// callMethod 会调用 Before, After 系列的钩子方法
 // value 为 nil 时调用表 Model 自身的方法，否则调用 value 的方法
 //
 // 钩子函数签名: func (x *T) BeforeQuery(s *Session) error
 // 只要返回的 error 不为 nil，就会自动终止后续 SQL 执行。
 //
 // 钩子函数默认开启，无需额外开关。
-func (s *Session) CallMethod(method string, value interface{}) {
+func (s *Session) callMethod(method string, value interface{}) {
 	// 若先前的钩子已经返回错误，则跳过后续所有钩子
 	if s.hookErr != nil {
 		return

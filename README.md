@@ -52,24 +52,25 @@ engine, err := borm.NewEngine("test.db")
 	)
 
 
+	// 查询统一为一个 Query 方法，按 dest 的反射类型自动判别取一条 / 取多条
 	var u User
-	_ = s.Where("Name = ?", "tomygin").Get(&u)
+	_ = s.Where("Name = ?", "tomygin").Query(&u) // *Struct → 取一条
 
 	var list []User
-	_ = s.Where("Age > ?", 10).Limit(10).Offset(0).All(&list)
+	_ = s.Where("Age > ?", 10).Limit(10).Offset(0).Query(&list) // *[]Struct → 取多条
 
-	// Raw 风格 取一条 / 取多条 / 单值 / 基础类型切片
+	// Raw 风格 取一条 / 取多条 / 单值 / 基础类型切片，同样用 Query
 	var u2 User
-	_ = s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u2)
+	_ = s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Query(&u2)
 
 	var users []User
-	_ = s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 10).All(&users)
+	_ = s.Raw("SELECT Name, Age FROM User WHERE Age > ?", 10).Query(&users)
 
 	var count int
-	_ = s.Raw("SELECT COUNT(*) FROM User").Get(&count)
+	_ = s.Raw("SELECT COUNT(*) FROM User").Query(&count)
 
 	var names []string
-	_ = s.Raw("SELECT Name FROM User").All(&names)
+	_ = s.Raw("SELECT Name FROM User").Query(&names)
 	fmt.Println(names)
 
 	// 写操作
@@ -85,7 +86,7 @@ engine, err := borm.NewEngine("test.db")
 		_ = s.Sync()
 		_, _ = s.Insert(&User{Name: "tx_user", Age: 1})
 		t := User{}
-		return t, s.Where("Name = ?", "tx_user").Get(&t)
+		return t, s.Where("Name = ?", "tx_user").Query(&t)
 	})
 	fmt.Println(r, err)
 }
@@ -119,17 +120,23 @@ BeforeInsert / AfterInsert
 | `file:xxx.db`                                       | `sqlite`     |
 | `path/to/file.db` / `*.sqlite` / `*.sqlite3`        | `sqlite`     |
 
-### 统一的 Get / All / Run
+### 统一的 Query / Run
+
+查询不再区分 `Get` / `First` / `All`，统一为一个 `Query` 方法，
+根据传入 `dest` 的**反射类型自动判别**取一条还是取多条：
+
+- `dest` 为切片指针 `*[]T` → 取多条
+- `dest` 为其它指针 `*Struct` / `*基础类型` → 取一条
 
 ORM 和 Raw 共享同一套终结方法；根据是否调用过 `Raw(...)` 自动选择模式：
 
-| 方法                     | ORM 模式             | Raw 模式                                     |
-| ------------------------ | -------------------- | -------------------------------------------- |
-| `s.Where(...).Get(&x)`   | 取一条到 `*Struct`   | ——                                           |
-| `s.Where(...).All(&xs)`  | 取多条到 `*[]Struct` | ——                                           |
-| `s.Raw(sql...).Get(&x)`  | ——                   | 取一条，`*Struct` 或 `*int / *string / ...`  |
-| `s.Raw(sql...).All(&xs)` | ——                   | 取多条，`*[]Struct` 或 `*[]int / *[]string`  |
-| `s.Raw(sql...).Run()`    | ——                   | 执行写操作（INSERT / UPDATE / DELETE / DDL） |
+| 方法                       | ORM 模式             | Raw 模式                                     |
+| -------------------------- | -------------------- | -------------------------------------------- |
+| `s.Where(...).Query(&x)`   | 取一条到 `*Struct`   | ——                                           |
+| `s.Where(...).Query(&xs)`  | 取多条到 `*[]Struct` | ——                                           |
+| `s.Raw(sql...).Query(&x)`  | ——                   | 取一条，`*Struct` 或 `*int / *string / ...`  |
+| `s.Raw(sql...).Query(&xs)` | ——                   | 取多条，`*[]Struct` 或 `*[]int / *[]string`  |
+| `s.Raw(sql...).Run()`      | ——                   | 执行写操作（INSERT / UPDATE / DELETE / DDL） |
 
 结构体按列名匹配字段，忽略大小写。多段 `Raw` 可链式拼接，之间自动以空格连接：
 
@@ -137,7 +144,7 @@ ORM 和 Raw 共享同一套终结方法；根据是否调用过 `Raw(...)` 自�
 s.Raw("SELECT Name, Age FROM User").
   Raw("WHERE Age BETWEEN ? AND ?", 10, 30).
   Raw("ORDER BY Age DESC").
-  All(&users)
+  Query(&users)
 ```
 
 ### Sync 自动同步表结构
@@ -160,4 +167,4 @@ s.Raw("SELECT Name, Age FROM User").
 - [x] 支持 mysql / postgres / sqlite
 - [x] 内置驱动，DSN 自动识别
 - [x] `Sync` 自动同步表结构（建表 + 加列 + 改类型 + 删列）
-- [x] 简洁且统一的 Get / All / Run 接口
+- [x] 简洁且统一的 Query / Run 接口（按反射类型自动判别取一条 / 取多条）

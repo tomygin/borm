@@ -1,15 +1,13 @@
 package session
 
 import (
-	"reflect"
-
 	"github.com/tomygin/borm/clause"
 )
 
 // Insert 插入一条或多条记录
 func (s *Session) Insert(values ...interface{}) (int64, error) {
-	s.CallMethod(BeforeInsert, nil)
-	defer s.CallMethod(AfterInsert, nil)
+	s.callMethod(beforeInsert, nil)
+	defer s.callMethod(afterInsert, nil)
 
 	recordValues := make([]interface{}, 0)
 	for _, value := range values {
@@ -20,7 +18,7 @@ func (s *Session) Insert(values ...interface{}) (int64, error) {
 
 	s.clause.Set(clause.VALUES, recordValues...)
 	sql, vars := s.clause.Build(clause.INSERT, clause.VALUES)
-	resout, err := s.Raw(sql, vars...).Exec()
+	resout, err := s.Raw(sql, vars...).exec()
 	if err != nil {
 		return 0, err
 	}
@@ -29,8 +27,8 @@ func (s *Session) Insert(values ...interface{}) (int64, error) {
 
 // Update 更新匹配行
 func (s *Session) Update(kv ...interface{}) (int64, error) {
-	s.CallMethod(BeforeUpdate, nil)
-	defer s.CallMethod(AfterUpdate, nil)
+	s.callMethod(beforeUpdate, nil)
+	defer s.callMethod(afterUpdate, nil)
 
 	m, ok := kv[0].(map[string]interface{})
 	if !ok {
@@ -41,7 +39,7 @@ func (s *Session) Update(kv ...interface{}) (int64, error) {
 	}
 	s.clause.Set(clause.UPDATE, s.RefTable().Name, m)
 	sql, vars := s.clause.Build(clause.UPDATE, clause.WHERE)
-	result, err := s.Raw(sql, vars...).Exec()
+	result, err := s.Raw(sql, vars...).exec()
 	if err != nil {
 		return 0, err
 	}
@@ -50,12 +48,12 @@ func (s *Session) Update(kv ...interface{}) (int64, error) {
 
 // Delete 删除匹配行
 func (s *Session) Delete() (int64, error) {
-	s.CallMethod(BeforeDelete, nil)
-	defer s.CallMethod(AfterDelete, nil)
+	s.callMethod(beforeDelete, nil)
+	defer s.callMethod(afterDelete, nil)
 
 	s.clause.Set(clause.DELETE, s.RefTable().Name)
 	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
-	result, err := s.Raw(sql, vars...).Exec()
+	result, err := s.Raw(sql, vars...).exec()
 	if err != nil {
 		return 0, err
 	}
@@ -66,7 +64,7 @@ func (s *Session) Delete() (int64, error) {
 func (s *Session) Count() (int64, error) {
 	s.clause.Set(clause.COUNT, s.RefTable().Name)
 	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
-	row := s.Raw(sql, vars...).QueryRow()
+	row := s.Raw(sql, vars...).queryRow()
 
 	var tmp int64
 	err := row.Scan(&tmp)
@@ -114,6 +112,3 @@ func (s *Session) buildSelect(model interface{}) (string, []interface{}) {
 func (s *Session) hasRaw() bool {
 	return s.sql.Len() > 0
 }
-
-// _ 用于避免 reflect 导入被 linter 识别为未使用（其他文件已用，这里兜底）
-var _ = reflect.TypeOf
