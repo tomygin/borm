@@ -76,20 +76,15 @@ func main() {
 	fmt.Println("engine 初始化完成")
 
 	// ======================================================
-	// 2) 表结构：Model / RefTable / CreateTable / IsExistTable / DropTable / Sync
+	// 2) 表结构：Model / RefTable / DropTable / Sync
 	// ======================================================
-	title("Model / CreateTable / IsExistTable / DropTable")
+	title("Model / RefTable / DropTable")
 
 	s.Model(&User{}) // 绑定模型
 
-	fmt.Println("RefTable Name:", s.RefTable().Name)       // RefTable
-	fmt.Println("IsExistTable(before):", s.IsExistTable()) // false
+	fmt.Println("RefTable Name:", s.RefTable().Name) // RefTable
 
-	_ = s.CreateTable() // CreateTable
-	fmt.Println("IsExistTable(after create):", s.IsExistTable())
-
-	_ = s.DropTable() // DropTable
-	fmt.Println("IsExistTable(after drop):", s.IsExistTable())
+	_ = s.DropTable() // DropTable 删除表（若存在）
 
 	title("Sync (自动建表/加列/改类型/删除多余列)")
 
@@ -101,7 +96,7 @@ func main() {
 		panic(err)
 	}
 	var cols []string
-	_ = s.Raw("SELECT name FROM pragma_table_info('User')").All(&cols)
+	_ = s.Raw("SELECT name FROM pragma_table_info('User')").Query(&cols)
 	fmt.Println("sync 后列:", cols)
 
 	// ======================================================
@@ -131,90 +126,63 @@ func main() {
 	fmt.Println("Delete affect:", n3)
 
 	// ======================================================
-	// 4) ORM 查询：Where / OrderBy / Limit / Offset / Get / All / Count
+	// 4) ORM 查询：Where / OrderBy / Limit / Offset / Query / Count
+	//    Query 根据 dest 的反射类型自动判别取一条还是取多条
 	// ======================================================
-	title("Get / All / Where / OrderBy / Limit / Offset / Count")
+	title("Query / Where / OrderBy / Limit / Offset / Count")
 
 	var u User
-	_ = s.Where("Name = ?", "tomygin").Get(&u) // Get 单条
-	fmt.Println("Get:", u)
+	_ = s.Where("Name = ?", "tomygin").Query(&u) // dest 为 *Struct → 取一条
+	fmt.Println("Query one:", u)
 
 	var all []User
-	_ = s.OrderBy("Age DESC").Limit(10).Offset(0).All(&all) // All 多条
-	fmt.Println("All:", all)
+	_ = s.OrderBy("Age DESC").Limit(10).Offset(0).Query(&all) // dest 为 *[]Struct → 取多条
+	fmt.Println("Query all:", all)
 
 	total, _ := s.Where("Age > ?", 1).Count() // Count
 	fmt.Println("Count:", total)
 
 	// ======================================================
-	// 5) Raw 系列：Raw / Run / Get / All / Exec / QueryRow / QueryRows
+	// 5) Raw 系列：Raw / Run / Query
+	//    Query 同样根据 dest 反射类型自动判别取一条/取多条
 	// ======================================================
-	title("Raw + Run / Get / All")
+	title("Raw + Run / Query")
 
 	// Run：写操作
 	_ = s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "raw_a", 100).Run()
 
-	// Raw + Get 到结构体
+	// Raw + Query 到结构体（*Struct → 取一条）
 	var u2 User
-	_ = s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Get(&u2)
-	fmt.Println("Raw Get struct:", u2)
+	_ = s.Raw("SELECT Name, Age FROM User WHERE Name = ?", "tomygin").Query(&u2)
+	fmt.Println("Raw Query struct:", u2)
 
-	// Raw + Get 到基础类型
+	// Raw + Query 到基础类型（*int → 取一条）
 	var cnt int
-	_ = s.Raw("SELECT COUNT(*) FROM User").Get(&cnt)
-	fmt.Println("Raw Get int:", cnt)
+	_ = s.Raw("SELECT COUNT(*) FROM User").Query(&cnt)
+	fmt.Println("Raw Query int:", cnt)
 
-	// Raw + All 到结构体切片
+	// Raw + Query 到结构体切片（*[]Struct → 取多条）
 	var users []User
-	_ = s.Raw("SELECT Name, Age FROM User ORDER BY Age DESC").All(&users)
-	fmt.Println("Raw All []struct:", users)
+	_ = s.Raw("SELECT Name, Age FROM User ORDER BY Age DESC").Query(&users)
+	fmt.Println("Raw Query []struct:", users)
 
-	// Raw + All 到基础类型切片
+	// Raw + Query 到基础类型切片（*[]string → 取多条）
 	var names []string
-	_ = s.Raw("SELECT Name FROM User").All(&names)
-	fmt.Println("Raw All []string:", names)
+	_ = s.Raw("SELECT Name FROM User").Query(&names)
+	fmt.Println("Raw Query []string:", names)
 
 	// 多段 Raw 链式拼接（自动以空格连接）
 	var filtered []User
 	_ = s.Raw("SELECT Name, Age FROM User").
 		Raw("WHERE Age BETWEEN ? AND ?", 10, 30).
 		Raw("ORDER BY Age DESC").
-		All(&filtered)
-	fmt.Println("Raw 链式 All:", filtered)
-
-	title("Raw + Exec / QueryRow / QueryRows（底层 API）")
-
-	// Exec：返回 sql.Result
-	res, _ := s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "raw_a").Exec()
-	if res != nil {
-		n, _ := res.RowsAffected()
-		fmt.Println("Exec RowsAffected:", n)
-	}
-
-	// QueryRow：单行 *sql.Row
-	row := s.Raw("SELECT Age FROM User WHERE Name = ?", "raw_a").QueryRow()
-	var age int
-	if row != nil {
-		_ = row.Scan(&age)
-	}
-	fmt.Println("QueryRow Age:", age)
-
-	// QueryRows：多行 *sql.Rows（需要自己关）
-	rows, _ := s.Raw("SELECT Name, Age FROM User").QueryRows()
-	if rows != nil {
-		for rows.Next() {
-			var n string
-			var a int
-			_ = rows.Scan(&n, &a)
-			fmt.Println("  row:", n, a)
-		}
-		_ = rows.Close()
-	}
+		Query(&filtered)
+	fmt.Println("Raw 链式 Query:", filtered)
 
 	// ======================================================
-	// 6) Session 杂项：DB / Clear / CallMethod
+	// 6) Session 杂项：DB / Clear
 	// ======================================================
-	title("DB / Clear / CallMethod")
+	title("DB / Clear")
 
 	// DB 返回底层 *sql.DB (或事务里的 *sql.Tx)
 	_ = s.DB() // session.CommonDB
@@ -222,16 +190,6 @@ func main() {
 	// Clear 手动清空缓冲区（一般不用调，执行类方法会自动调）
 	s.Raw("SELECT 1")
 	s.Clear()
-
-	// CallMethod 手动调用钩子（底层 API，一般不用）
-	s.Model(&User{}).CallMethod(session.BeforeQuery, nil)
-	// session 里可用的钩子常量：
-	_ = []string{
-		session.BeforeQuery, session.AfterQuery,
-		session.BeforeInsert, session.AfterInsert,
-		session.BeforeUpdate, session.AfterUpdate,
-		session.BeforeDelete, session.AfterDelete,
-	}
 
 	// ======================================================
 	// 7) 事务：Engine.Transaction（高层）或 Begin/Commit/RollBack（底层）
@@ -243,7 +201,7 @@ func main() {
 		_ = ts.Sync()
 		_, _ = ts.Insert(&User{Name: "tx_ok", Age: 66})
 		var t User
-		return t, ts.Where("Name = ?", "tx_ok").Get(&t)
+		return t, ts.Where("Name = ?", "tx_ok").Query(&t)
 	})
 	fmt.Println("Transaction ok:", r, err)
 
@@ -257,7 +215,7 @@ func main() {
 
 	// 验证 tx_bad 已回滚：Get 返回 sql.ErrNoRows 表示找不到
 	var miss User
-	err3 := s.Where("Name = ?", "tx_bad").Get(&miss)
+	err3 := s.Where("Name = ?", "tx_bad").Query(&miss)
 	fmt.Println("tx_bad 已回滚（查不到）:", errors.Is(err3, sql.ErrNoRows))
 
 	title("Begin / Commit / RollBack（手动事务）")

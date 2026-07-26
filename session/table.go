@@ -25,8 +25,8 @@ func (s *Session) RefTable() *schema.Schema {
 	return s.refTable
 }
 
-// CreateTable 根据 Model 创建表
-func (s *Session) CreateTable() error {
+// createTable 根据 Model 创建表（由 Sync 内部调用）
+func (s *Session) createTable() error {
 	table := s.RefTable()
 	var col []string
 	for _, field := range table.Fields {
@@ -34,20 +34,20 @@ func (s *Session) CreateTable() error {
 	}
 
 	desc := strings.Join(col, ",")
-	_, err := s.Raw(fmt.Sprintf("CREATE TABLE %s (%s);", table.Name, desc)).Exec()
+	_, err := s.Raw(fmt.Sprintf("CREATE TABLE %s (%s);", table.Name, desc)).exec()
 	return err
 }
 
 // DropTable 删除表（若存在）
 func (s *Session) DropTable() error {
-	_, err := s.Raw(fmt.Sprintf("DROP TABLE IF EXISTS %s", s.RefTable().Name)).Exec()
+	_, err := s.Raw(fmt.Sprintf("DROP TABLE IF EXISTS %s", s.RefTable().Name)).exec()
 	return err
 }
 
-// IsExistTable 判断表是否存在
-func (s *Session) IsExistTable() bool {
+// isExistTable 判断表是否存在（由 Sync 内部调用）
+func (s *Session) isExistTable() bool {
 	sqlStr, values := s.dialect.TableExistSql(s.RefTable().Name)
-	row := s.Raw(sqlStr, values...).QueryRow()
+	row := s.Raw(sqlStr, values...).queryRow()
 	if row == nil {
 		return false
 	}
@@ -60,7 +60,7 @@ func (s *Session) IsExistTable() bool {
 // key 统一小写便于比对
 func (s *Session) existingColumns() (map[string]string, error) {
 	sqlStr, values := s.dialect.TableColumnsSql(s.RefTable().Name)
-	rows, err := s.Raw(sqlStr, values...).QueryRows()
+	rows, err := s.Raw(sqlStr, values...).queryRows()
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +89,8 @@ func (s *Session) Sync() error {
 		return errors.New("model is not set, please call Model() first")
 	}
 
-	if !s.IsExistTable() {
-		return s.CreateTable()
+	if !s.isExistTable() {
+		return s.createTable()
 	}
 
 	existing, err := s.existingColumns()
@@ -110,7 +110,7 @@ func (s *Session) Sync() error {
 		if !ok {
 			// 缺失：补加
 			addSQL := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table.Name, f.Name, f.Type)
-			if _, err := s.Raw(addSQL).Exec(); err != nil {
+			if _, err := s.Raw(addSQL).exec(); err != nil {
 				return fmt.Errorf("sync add column %s failed: %w", f.Name, err)
 			}
 			continue
@@ -124,7 +124,7 @@ func (s *Session) Sync() error {
 				if alterSQL == "" {
 					continue
 				}
-				if _, err := s.Raw(alterSQL).Exec(); err != nil {
+				if _, err := s.Raw(alterSQL).exec(); err != nil {
 					return fmt.Errorf("sync alter column %s failed: %w", f.Name, err)
 				}
 			}
@@ -140,7 +140,7 @@ func (s *Session) Sync() error {
 		if dropSQL == "" {
 			continue
 		}
-		if _, err := s.Raw(dropSQL).Exec(); err != nil {
+		if _, err := s.Raw(dropSQL).exec(); err != nil {
 			return fmt.Errorf("sync drop column %s failed: %w", colName, err)
 		}
 	}
