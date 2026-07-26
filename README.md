@@ -73,8 +73,8 @@ engine, err := borm.NewEngine("test.db")
 	_ = s.Raw("SELECT Name FROM User").Query(&names)
 	fmt.Println(names)
 
-	// 写操作
-	_ = s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Run()
+	// 写操作：Query 不带参数即执行（INSERT / UPDATE / DELETE / DDL）
+	_ = s.Raw("UPDATE User SET Age = Age + 1 WHERE Name = ?", "tomygin").Query()
 
 	// ORM 更新 / 删除
 	_, _ = s.Where("Name = ?", "tomygin").Update("Age", 21)
@@ -120,15 +120,16 @@ BeforeInsert / AfterInsert
 | `file:xxx.db`                                       | `sqlite`     |
 | `path/to/file.db` / `*.sqlite` / `*.sqlite3`        | `sqlite`     |
 
-### 统一的 Query / Run
+### 唯一的终结方法 Query
 
-查询不再区分 `Get` / `First` / `All`，统一为一个 `Query` 方法，
-根据传入 `dest` 的**反射类型自动判别**取一条还是取多条：
+查询不再区分 `Get` / `First` / `All`，写操作也不再单列 `Run`，
+全部统一为一个 `Query` 方法，根据**传入参数**自动决定行为：
 
-- `dest` 为切片指针 `*[]T` → 取多条
-- `dest` 为其它指针 `*Struct` / `*基础类型` → 取一条
+- **不传参数** → 执行写操作（INSERT / UPDATE / DELETE / DDL），只返回 error
+- 传入切片指针 `*[]T` → 取多条
+- 传入其它指针 `*Struct` / `*基础类型` → 取一条
 
-ORM 和 Raw 共享同一套终结方法；根据是否调用过 `Raw(...)` 自动选择模式：
+查询时 ORM 和 Raw 共享这一套方法；根据是否调用过 `Raw(...)` 自动选择模式：
 
 | 方法                       | ORM 模式             | Raw 模式                                     |
 | -------------------------- | -------------------- | -------------------------------------------- |
@@ -136,7 +137,7 @@ ORM 和 Raw 共享同一套终结方法；根据是否调用过 `Raw(...)` 自�
 | `s.Where(...).Query(&xs)`  | 取多条到 `*[]Struct` | ——                                           |
 | `s.Raw(sql...).Query(&x)`  | ——                   | 取一条，`*Struct` 或 `*int / *string / ...`  |
 | `s.Raw(sql...).Query(&xs)` | ——                   | 取多条，`*[]Struct` 或 `*[]int / *[]string`  |
-| `s.Raw(sql...).Run()`      | ——                   | 执行写操作（INSERT / UPDATE / DELETE / DDL） |
+| `s.Raw(sql...).Query()`    | ——                   | 执行写操作（INSERT / UPDATE / DELETE / DDL） |
 
 结构体按列名匹配字段，忽略大小写。多段 `Raw` 可链式拼接，之间自动以空格连接：
 
@@ -167,4 +168,4 @@ s.Raw("SELECT Name, Age FROM User").
 - [x] 支持 mysql / postgres / sqlite
 - [x] 内置驱动，DSN 自动识别
 - [x] `Sync` 自动同步表结构（建表 + 加列 + 改类型 + 删列）
-- [x] 简洁且统一的 Query / Run 接口（按反射类型自动判别取一条 / 取多条）
+- [x] 唯一的终结方法 Query（不带参数即写操作；带参数按反射类型自动判别取一条 / 取多条）

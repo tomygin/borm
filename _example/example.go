@@ -89,7 +89,7 @@ func main() {
 	title("Sync (自动建表/加列/改类型/删除多余列)")
 
 	// 先手动创建一个"旧"表：只有 Name 列、还多了一个 OldCol
-	_ = s.Raw("CREATE TABLE User (Name text, OldCol text)").Run()
+	_ = s.Raw("CREATE TABLE User (Name text, OldCol text)").Query()
 
 	// 用新 Model Sync 一下，预期列变为 [Name, Age]（OldCol 被删，Age 被加）
 	if err := s.Model(&User{}).Sync(); err != nil {
@@ -143,13 +143,13 @@ func main() {
 	fmt.Println("Count:", total)
 
 	// ======================================================
-	// 5) Raw 系列：Raw / Run / Query
-	//    Query 同样根据 dest 反射类型自动判别取一条/取多条
+	// 5) Raw 系列：Raw / Query
+	//    Query 不带参数 = 执行写操作；带参数按反射类型取一条/取多条
 	// ======================================================
-	title("Raw + Run / Query")
+	title("Raw + Query")
 
-	// Run：写操作
-	_ = s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "raw_a", 100).Run()
+	// Query 不带参数：写操作
+	_ = s.Raw("INSERT INTO User (Name, Age) VALUES (?, ?)", "raw_a", 100).Query()
 
 	// Raw + Query 到结构体（*Struct → 取一条）
 	var u2 User
