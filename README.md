@@ -149,19 +149,27 @@ s.Raw("SELECT Name, Age FROM User").
 
 ### ORM 写操作
 
-链式条件搭配 `Insert` / `Update` / `Delete`，写操作返回受影响行数：
+链式条件搭配 `Insert` / `Update` / `Delete`，三者都返回 `(受影响行数 int64, error)`：
 
 ```go
-n, _ := s.Insert(&User{Name: "a", Age: 1}, &User{Name: "b", Age: 2}) // 插入多条
+// Insert：一次插入一条或多条
+n, _ := s.Insert(&User{Name: "a", Age: 1})                          // 单条
+n, _ = s.Insert(&User{Name: "b", Age: 2}, &User{Name: "c", Age: 3}) // 多条
 
-// Update 支持 "k1", v1, "k2", v2 … 或 map[string]interface{}
+// Update 形式一：键值对 "col1", v1, "col2", v2 …
 n, _ = s.Where("Name = ?", "a").Update("Age", 10)
+
+// Update 形式二：map[string]interface{}，适合字段不固定的场景
 n, _ = s.Where("Name = ?", "b").Update(map[string]interface{}{"Age": 20})
 
+// Delete：配合 Where / Limit 删除匹配行
 n, _ = s.Where("Age < ?", 5).Limit(1).Delete()
 
-total, _ := s.Where("Age > ?", 1).Count() // 计数
+// Count：统计匹配行数
+total, _ := s.Where("Age > ?", 1).Count()
 ```
+
+> 写操作默认触发对应钩子（`BeforeInsert` / `AfterInsert` 等）；钩子返回 error 会终止本次 SQL。
 
 ### 钩子函数
 

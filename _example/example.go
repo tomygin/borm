@@ -101,29 +101,39 @@ func main() {
 
 	// ======================================================
 	// 3) ORM 写操作：Insert / Update / Delete
+	//    三者都返回 (受影响行数 int64, error)
 	// ======================================================
 	title("Insert / Update / Delete")
 
-	affect, _ := s.Insert(
+	// Insert：一次插入一条或多条，返回插入的行数
+	affect, err := s.Insert(
 		&User{Name: "tomygin", Age: 20},
 		&User{Name: "ice", Age: 19},
 		&User{Name: "test", Age: 18},
 	)
-	fmt.Println("Insert affect:", affect)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Insert 行数:", affect) // 3
 
-	// Update 两种形式：
-	// 1) "k1", v1, "k2", v2 …
+	// Update 形式一：键值对 "col1", v1, "col2", v2 …
 	n, _ := s.Where("Name = ?", "tomygin").Update("Age", 21)
-	fmt.Println("Update (kv) affect:", n)
+	fmt.Println("Update(kv) 行数:", n)
 
-	// 2) map
+	// Update 形式二：map[string]interface{}，适合字段不固定的场景
 	n2, _ := s.Where("Name = ?", "ice").Update(map[string]interface{}{
 		"Age": 30,
 	})
-	fmt.Println("Update (map) affect:", n2)
+	fmt.Println("Update(map) 行数:", n2)
 
+	// Delete：配合 Where / Limit 删除匹配行
 	n3, _ := s.Where("Age = ?", 18).Delete()
-	fmt.Println("Delete affect:", n3)
+	fmt.Println("Delete 行数:", n3)
+
+	// 读回验证写操作的实际效果（test 已删除，tomygin/ice 已更新）
+	var afterCUD []User
+	_ = s.OrderBy("Age").Query(&afterCUD)
+	fmt.Println("写操作后:", afterCUD) // [{tomygin 21} {ice 30}]
 
 	// ======================================================
 	// 4) ORM 查询：Where / OrderBy / Limit / Offset / Query / Count
